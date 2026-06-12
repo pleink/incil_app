@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
+import '../widgets/error_view.dart';
+import '../widgets/primary_button.dart';
+
 class OfflineScreen extends StatelessWidget {
   const OfflineScreen({super.key, this.onRetry});
 
@@ -7,16 +11,22 @@ class OfflineScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Placeholder — full screen lands in M13.
+    final l = AppLocalizations.of(context);
     return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Offline'),
-            if (onRetry != null)
-              TextButton(onPressed: onRetry, child: const Text('Retry')),
-          ],
+      body: SafeArea(
+        child: Center(
+          child: ErrorView(
+            title: l.offlineTitle,
+            message: l.offlineMessage,
+            icon: Icons.wifi_off_rounded,
+            action: onRetry == null
+                ? null
+                : PrimaryButton(
+                    label: l.retry,
+                    icon: Icons.refresh,
+                    onPressed: onRetry,
+                  ),
+          ),
         ),
       ),
     );
