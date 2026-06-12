@@ -84,6 +84,13 @@ class AppShellCubit extends Cubit<AppShellState> {
     unawaited(_pushService.applyTags(tags));
   }
 
+  Future<void> markOnboardingCompleted(int version) async {
+    await _storage.setCompletedOnboardingVersion(version);
+    unawaited(_pushService.requestPermission());
+    final current = _appStateService.current;
+    if (current != null) emit(_resolve(current));
+  }
+
   Future<void> retryFromOffline() async {
     emit(const AppShellSplash());
     _splashTimer?.cancel();
