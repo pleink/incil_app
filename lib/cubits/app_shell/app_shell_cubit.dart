@@ -91,6 +91,11 @@ class AppShellCubit extends Cubit<AppShellState> {
     if (current != null) emit(_resolve(current));
   }
 
+  void reportWebViewFailure() {
+    if (state is AppShellOffline) return;
+    emit(const AppShellOffline());
+  }
+
   Future<void> retryFromOffline() async {
     emit(const AppShellSplash());
     _splashTimer?.cancel();
