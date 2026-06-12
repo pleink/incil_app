@@ -7,6 +7,7 @@ import 'di/service_locator.dart';
 import 'l10n/app_localizations.dart';
 import 'navigation/app_router.dart';
 import 'services/app_state_service.dart';
+import 'services/connectivity_service.dart';
 import 'services/local_storage_service.dart';
 import 'services/push_service.dart';
 import 'services/version_service.dart';
@@ -27,6 +28,7 @@ class _IncilAppState extends State<IncilApp> {
     versionService: getIt<VersionService>(),
     storage: getIt<LocalStorageService>(),
     pushService: getIt<PushService>(),
+    connectivity: getIt<ConnectivityService>(),
   );
 
   late final _router = buildAppRouter(_cubit);

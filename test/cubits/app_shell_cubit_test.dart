@@ -12,6 +12,7 @@ import 'package:incil_camp_app/models/force_update_config.dart';
 import 'package:incil_camp_app/models/onboarding_config.dart';
 import 'package:incil_camp_app/models/onboarding_slide.dart';
 import 'package:incil_camp_app/services/app_state_service.dart';
+import 'package:incil_camp_app/services/connectivity_service.dart';
 import 'package:incil_camp_app/services/local_storage_service.dart';
 import 'package:incil_camp_app/services/push_service.dart';
 import 'package:incil_camp_app/services/version_service.dart';
@@ -23,6 +24,8 @@ class _VersionServiceMock extends Mock implements VersionService {}
 class _LocalStorageServiceMock extends Mock implements LocalStorageService {}
 
 class _PushServiceMock extends Mock implements PushService {}
+
+class _ConnectivityServiceMock extends Mock implements ConnectivityService {}
 
 AppState _state({
   EmergencyConfig emergency = EmergencyConfig.empty,
@@ -52,17 +55,22 @@ void main() {
   late _VersionServiceMock versionService;
   late _LocalStorageServiceMock storage;
   late _PushServiceMock pushService;
+  late _ConnectivityServiceMock connectivity;
   late StreamController<AppState?> controller;
+  late StreamController<bool> connController;
 
   setUp(() {
     appStateService = _AppStateServiceMock();
     versionService = _VersionServiceMock();
     storage = _LocalStorageServiceMock();
     pushService = _PushServiceMock();
+    connectivity = _ConnectivityServiceMock();
     controller = StreamController<AppState?>.broadcast();
+    connController = StreamController<bool>.broadcast();
 
     when(() => appStateService.stream).thenAnswer((_) => controller.stream);
     when(() => appStateService.current).thenReturn(null);
+    when(() => appStateService.hasRealData).thenReturn(true);
     when(() => appStateService.retry()).thenAnswer((_) async {});
     when(() => versionService.mustForceUpdate(any())).thenReturn(false);
     when(() => storage.completedOnboardingVersion).thenReturn(0);
@@ -73,9 +81,16 @@ void main() {
     when(() => storage.setPushPermissionRequested()).thenAnswer((_) async {});
     when(() => pushService.applyTags(any())).thenAnswer((_) async {});
     when(() => pushService.requestPermission()).thenAnswer((_) async {});
+    when(() => connectivity.isOnline()).thenAnswer((_) async => true);
+    when(
+      () => connectivity.onlineStream,
+    ).thenAnswer((_) => connController.stream);
   });
 
-  tearDown(() => controller.close());
+  tearDown(() {
+    controller.close();
+    connController.close();
+  });
 
   AppShellCubit build({Duration splashTimeout = const Duration(seconds: 8)}) =>
       AppShellCubit(
@@ -83,6 +98,7 @@ void main() {
         versionService: versionService,
         storage: storage,
         pushService: pushService,
+        connectivity: connectivity,
         splashTimeout: splashTimeout,
       );
 
@@ -321,6 +337,63 @@ void main() {
       verify: (c) {
         // URL unchanged from the original AppState.
         expect((c.state as AppShellWebView).url, 'https://incil.huulo.io/app');
+      },
+    );
+  });
+
+  group('connectivity-driven recovery', () {
+    test(
+      'first launch with no Firestore data and offline goes straight to Offline',
+      () async {
+        when(() => appStateService.current).thenReturn(_state());
+        when(() => appStateService.hasRealData).thenReturn(false);
+        when(() => connectivity.isOnline()).thenAnswer((_) async => false);
+
+        final cubit = build();
+        // Push the initial offline read through before the first emit.
+        await Future<void>.microtask(() {});
+        // Re-emit so _resolve runs against the updated _isOnline.
+        controller.add(_state());
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+
+        expect(cubit.state, isA<AppShellOffline>());
+        await cubit.close();
+      },
+    );
+
+    test(
+      'auto-retries when connectivity flips online while on Offline screen',
+      () async {
+        when(() => appStateService.current).thenReturn(_state());
+        final cubit = build();
+        cubit.reportWebViewFailure();
+        expect(cubit.state, isA<AppShellOffline>());
+
+        // Drop and recover — only an offline→online transition triggers retry.
+        connController.add(false);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        connController.add(true);
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+
+        verify(() => appStateService.retry()).called(1);
+        expect(cubit.state, isA<AppShellWebView>());
+        await cubit.close();
+      },
+    );
+
+    test(
+      'does NOT auto-retry on connectivity events while NOT on Offline screen',
+      () async {
+        when(() => appStateService.current).thenReturn(_state());
+        final cubit = build();
+        expect(cubit.state, isA<AppShellWebView>());
+
+        connController.add(false);
+        connController.add(true);
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+
+        verifyNever(() => appStateService.retry());
+        await cubit.close();
       },
     );
   });

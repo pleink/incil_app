@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -6,6 +8,7 @@ import '../cubits/app_shell/app_shell_cubit.dart';
 import '../cubits/webview/webview_cubit.dart';
 import '../cubits/webview/webview_state.dart';
 import '../di/service_locator.dart';
+import '../services/connectivity_service.dart';
 import '../services/url_service.dart';
 import '../util/host_allowlist.dart';
 import '../widgets/loading_view.dart';
@@ -42,6 +45,9 @@ class _WebViewView extends StatefulWidget {
 class _WebViewViewState extends State<_WebViewView> {
   late final WebViewController _controller;
   final _urls = getIt<UrlService>();
+  final _connectivity = getIt<ConnectivityService>();
+  StreamSubscription<bool>? _connSub;
+  bool _wasOnline = true;
 
   @override
   void initState() {
@@ -65,6 +71,20 @@ class _WebViewViewState extends State<_WebViewView> {
         ),
       )
       ..loadRequest(Uri.parse(widget.url));
+
+    _connectivity.isOnline().then((online) => _wasOnline = online);
+    _connSub = _connectivity.onlineStream.listen((online) {
+      // Auto-reload the WebView as soon as the network comes back so users
+      // don't have to manually pull-to-refresh after a connection blip.
+      if (online && !_wasOnline) _controller.reload();
+      _wasOnline = online;
+    });
+  }
+
+  @override
+  void dispose() {
+    _connSub?.cancel();
+    super.dispose();
   }
 
   NavigationDecision _handleNavigation(NavigationRequest request) {

@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../models/app_state.dart';
 import '../../services/app_state_service.dart';
+import '../../services/connectivity_service.dart';
 import '../../services/local_storage_service.dart';
 import '../../services/push_service.dart';
 import '../../services/version_service.dart';
@@ -16,13 +17,20 @@ class AppShellCubit extends Cubit<AppShellState> {
     required VersionService versionService,
     required LocalStorageService storage,
     required PushService pushService,
+    required ConnectivityService connectivity,
     Duration splashTimeout = const Duration(seconds: 8),
   }) : _appStateService = appStateService,
        _versionService = versionService,
        _storage = storage,
        _pushService = pushService,
+       _connectivity = connectivity,
        super(const AppShellSplash()) {
     _subscription = _appStateService.stream.listen(_onAppState);
+    _connSubscription = _connectivity.onlineStream.listen(
+      _onConnectivityChanged,
+    );
+    _connectivity.isOnline().then((online) => _isOnline = online);
+
     if (_appStateService.current != null) {
       _onAppState(_appStateService.current);
     } else {
@@ -34,10 +42,13 @@ class AppShellCubit extends Cubit<AppShellState> {
   final VersionService _versionService;
   final LocalStorageService _storage;
   final PushService _pushService;
+  final ConnectivityService _connectivity;
 
   StreamSubscription<AppState?>? _subscription;
+  StreamSubscription<bool>? _connSubscription;
   Timer? _splashTimer;
   String? _lastTagsSignature;
+  bool _isOnline = true;
 
   void _onSplashTimeout() {
     if (state is AppShellSplash) emit(const AppShellOffline());
@@ -55,6 +66,16 @@ class AppShellCubit extends Cubit<AppShellState> {
     if (next is AppShellWebView) _maybeRequestPushPermission();
   }
 
+  void _onConnectivityChanged(bool online) {
+    final wasOnline = _isOnline;
+    _isOnline = online;
+    if (online && !wasOnline && state is AppShellOffline) {
+      // Network just came back while the user was looking at the Offline
+      // screen — bounce them back into the regular shell.
+      unawaited(retryFromOffline());
+    }
+  }
+
   void _maybeRequestPushPermission() {
     if (_storage.pushPermissionRequested) return;
     unawaited(_pushService.requestPermission());
@@ -70,6 +91,12 @@ class AppShellCubit extends Cubit<AppShellState> {
     }
     if (_shouldShowOnboarding(appState.onboarding)) {
       return AppShellOnboarding(appState.onboarding);
+    }
+    // First-launch offline guard: if we're showing the fallback URL with no
+    // real Firestore/cached data AND the device is offline, the WebView is
+    // guaranteed to fail. Skip the flicker and go straight to Offline.
+    if (!_appStateService.hasRealData && !_isOnline) {
+      return const AppShellOffline();
     }
     return AppShellWebView(
       url: appState.webviewUrl,
@@ -126,12 +153,17 @@ class AppShellCubit extends Cubit<AppShellState> {
     _splashTimer?.cancel();
     _splashTimer = Timer(const Duration(seconds: 8), _onSplashTimeout);
     await _appStateService.retry();
+    // Re-resolve immediately against the (possibly cached) current state so
+    // we don't hang on Splash when there's already data to work with.
+    final current = _appStateService.current;
+    if (current != null) _onAppState(current);
   }
 
   @override
   Future<void> close() async {
     _splashTimer?.cancel();
     await _subscription?.cancel();
+    await _connSubscription?.cancel();
     return super.close();
   }
 }

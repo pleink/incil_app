@@ -14,6 +14,7 @@ class AppStateService {
     AppState? fallback,
   }) : _firestore = firestore,
        _storage = storage,
+       _hasFirestoreData = (storage.readCachedAppState()) != null,
        _subject = BehaviorSubject<AppState?>.seeded(
          storage.readCachedAppState() ?? fallback,
        );
@@ -22,6 +23,12 @@ class AppStateService {
   final LocalStorageService _storage;
   final BehaviorSubject<AppState?> _subject;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _sub;
+  bool _hasFirestoreData;
+
+  /// True once a Firestore snapshot has been successfully parsed, or true at
+  /// construction if a cached AppState was loaded from local storage. False
+  /// when the cubit is running purely on the `Flavor.defaultAppState` fallback.
+  bool get hasRealData => _hasFirestoreData;
 
   static const _docPath = 'apps/incil/config/app_state';
 
@@ -54,6 +61,7 @@ class AppStateService {
     try {
       final state = AppState.fromJson(data);
       await _storage.writeCachedAppState(state);
+      _hasFirestoreData = true;
       _subject.add(state);
     } catch (e, st) {
       developer.log(
