@@ -32,6 +32,14 @@ class _IncilAppState extends State<IncilApp> {
   late final _router = buildAppRouter(_cubit);
 
   @override
+  void initState() {
+    super.initState();
+    // Route OneSignal notification taps through the shell so the host allowlist
+    // applies and a tap can never bypass an emergency / force-update screen.
+    getIt<PushService>().onTargetUrl = _cubit.handleDeepLink;
+  }
+
+  @override
   void dispose() {
     _cubit.close();
     super.dispose();

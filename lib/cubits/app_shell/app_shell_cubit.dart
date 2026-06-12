@@ -7,6 +7,7 @@ import '../../services/app_state_service.dart';
 import '../../services/local_storage_service.dart';
 import '../../services/push_service.dart';
 import '../../services/version_service.dart';
+import '../../util/host_allowlist.dart';
 import 'app_shell_state.dart';
 
 class AppShellCubit extends Cubit<AppShellState> {
@@ -89,6 +90,22 @@ class AppShellCubit extends Cubit<AppShellState> {
     unawaited(_pushService.requestPermission());
     final current = _appStateService.current;
     if (current != null) emit(_resolve(current));
+  }
+
+  void handleDeepLink(Uri uri) {
+    final current = _appStateService.current;
+    if (current == null) return;
+    if (!isHostAllowed(uri, current.allowedHosts)) return;
+    // Only act when the WebView is the active surface — emergency / force-update
+    // / onboarding take precedence and we don't want a push to bypass them.
+    if (state is! AppShellWebView) return;
+    emit(
+      AppShellWebView(
+        url: uri.toString(),
+        allowedHosts: current.allowedHosts,
+        oneSignalTags: current.oneSignalTags,
+      ),
+    );
   }
 
   void reportWebViewFailure() {
