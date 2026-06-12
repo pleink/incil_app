@@ -12,12 +12,20 @@ class LocalStorageService {
 
   static const _kCompletedOnboardingVersion = 'completedOnboardingVersion';
   static const _kCachedAppStateJson = 'cachedAppStateJson';
+  static const _kPushPermissionRequested = 'pushPermissionRequested';
 
   int get completedOnboardingVersion =>
       _prefs.getInt(_kCompletedOnboardingVersion) ?? 0;
 
   Future<void> setCompletedOnboardingVersion(int version) async {
     await _prefs.setInt(_kCompletedOnboardingVersion, version);
+  }
+
+  bool get pushPermissionRequested =>
+      _prefs.getBool(_kPushPermissionRequested) ?? false;
+
+  Future<void> setPushPermissionRequested() async {
+    await _prefs.setBool(_kPushPermissionRequested, true);
   }
 
   AppState? readCachedAppState() {

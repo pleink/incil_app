@@ -69,6 +69,8 @@ void main() {
     when(
       () => storage.setCompletedOnboardingVersion(any()),
     ).thenAnswer((_) async {});
+    when(() => storage.pushPermissionRequested).thenReturn(false);
+    when(() => storage.setPushPermissionRequested()).thenAnswer((_) async {});
     when(() => pushService.applyTags(any())).thenAnswer((_) async {});
     when(() => pushService.requestPermission()).thenAnswer((_) async {});
   });
@@ -220,6 +222,35 @@ void main() {
         controller.add(_state(tags: const {'app': 'incil'}));
       },
       verify: (_) => verify(() => pushService.applyTags(any())).called(1),
+    );
+
+    blocTest<AppShellCubit, AppShellState>(
+      'requests push permission the first time WebView is shown',
+      build: build,
+      act: (c) => controller.add(_state()),
+      verify: (_) {
+        verify(() => pushService.requestPermission()).called(1);
+        verify(() => storage.setPushPermissionRequested()).called(1);
+      },
+    );
+
+    blocTest<AppShellCubit, AppShellState>(
+      'does NOT re-request push permission if already asked',
+      build: () {
+        when(() => storage.pushPermissionRequested).thenReturn(true);
+        return build();
+      },
+      act: (c) => controller.add(_state()),
+      verify: (_) => verifyNever(() => pushService.requestPermission()),
+    );
+
+    blocTest<AppShellCubit, AppShellState>(
+      'does NOT request push permission when entering Emergency screen',
+      build: build,
+      act: (c) => controller.add(
+        _state(emergency: const EmergencyConfig(enabled: true, title: 'E')),
+      ),
+      verify: (_) => verifyNever(() => pushService.requestPermission()),
     );
 
     blocTest<AppShellCubit, AppShellState>(

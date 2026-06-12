@@ -50,7 +50,15 @@ class AppShellCubit extends Cubit<AppShellState> {
     if (appState == null) return;
 
     _maybeApplyTags(appState.oneSignalTags);
-    emit(_resolve(appState));
+    final next = _resolve(appState);
+    emit(next);
+    if (next is AppShellWebView) _maybeRequestPushPermission();
+  }
+
+  void _maybeRequestPushPermission() {
+    if (_storage.pushPermissionRequested) return;
+    unawaited(_pushService.requestPermission());
+    unawaited(_storage.setPushPermissionRequested());
   }
 
   AppShellState _resolve(AppState appState) {
@@ -87,7 +95,7 @@ class AppShellCubit extends Cubit<AppShellState> {
 
   Future<void> markOnboardingCompleted(int version) async {
     await _storage.setCompletedOnboardingVersion(version);
-    unawaited(_pushService.requestPermission());
+    _maybeRequestPushPermission();
     final current = _appStateService.current;
     if (current != null) emit(_resolve(current));
   }
