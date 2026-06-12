@@ -2,81 +2,93 @@
 
 Guidance for Claude Code when working in this repository.
 
-Detailed references: [Tooling](docs/tooling.md)
+Detailed references: [Architecture](docs/architecture.md) · [Conventions](docs/conventions.md) · [Setup](docs/setup.md) · [Tooling](docs/tooling.md)
 
-> **Status:** project just initialized. Most architectural decisions (state management, navigation, DI, data layer, design system, conventions, git flow) have **not been made yet**. This file documents what exists today; expand it as decisions land.
+---
+
+## What this app is
+
+**Incil CampApp** is a branded Flutter mobile shell around a huulo.io WebView.
+Native screens cover splash, onboarding, emergency, force-update, and offline;
+everything else is the WebView. Remote control comes from a single Firestore
+document (`apps/incil/config/app_state`). Push notifications go through
+OneSignal. Platforms: **iOS + Android only**.
+
+Read [docs/architecture.md](docs/architecture.md) for the full spine and
+[docs/setup.md](docs/setup.md) for the manual one-time steps (Firebase,
+Xcode schemes, OneSignal capabilities, Firestore seed).
 
 ---
 
 ## Commands
 
-All Flutter/Dart commands go through `fvm` (Flutter is pinned to **3.35.7** in `.fvmrc`):
+Two flavor entrypoints; always run through `fvm` (Flutter pinned to 3.35.7).
 
 ```bash
-fvm flutter pub get            # fetch packages
-fvm flutter run                # run on default device
-fvm flutter analyze            # static analysis
-fvm flutter test               # run tests
-fvm flutter build ios          # iOS build
-fvm flutter build apk          # Android APK
-fvm flutter build appbundle    # Android AAB
+fvm flutter pub get
+fvm flutter run --flavor dev  -t lib/main_dev.dart
+fvm flutter run --flavor prod -t lib/main_prod.dart
+
+fvm flutter analyze
+fvm flutter test
+
+fvm flutter gen-l10n                                  # regenerate lib/l10n/
+fvm flutter build apk      --flavor dev  -t lib/main_dev.dart
+fvm flutter build appbundle --flavor prod -t lib/main_prod.dart
+fvm flutter build ios      --flavor prod -t lib/main_prod.dart
 ```
 
----
-
-## Project layout
-
-- `lib/main.dart` — app entry point (currently the default Flutter counter app).
-- `android/` — Android host app, package `ch.incil.incil_camp_app`.
-- `ios/` — iOS host app, bundle `ch.incil.incilCampApp`, display name **Incil CampApp**.
-- `test/` — widget tests (default `widget_test.dart` only).
-- Platforms: **android, ios only** (web/desktop intentionally excluded).
+`flutter run` against `lib/main.dart` throws on purpose — use the flavor entrypoints.
 
 ---
 
-## Architecture
+## Architecture in one screen
 
-**TBD.** No state management, navigation, DI, persistence, or API client has been chosen yet. When making architectural decisions, prefer:
-1. Use the `mobile-dev:architect` sub-agent to plan the approach.
-2. Re-run `/mobile-dev:setup` after major decisions land to refresh this file and create `docs/architecture.md`.
+- **Stack:** Cubit + GetIt (single scope) + go_router (plain `GoRoute`, no codegen).
+- **One Firestore listener** (`AppStateService`) feeds `AppShellCubit`, which
+  resolves the screen-priority decision:
+  `emergency > forceUpdate > onboarding > webview`. A `GoRouter.redirect`
+  watches the cubit and snaps to the right path. `AppShellOffline` is reached
+  either by an 8s splash timeout with no data, or by a WebView load failure.
+- **Offline cache:** SharedPreferences. Last good Firestore doc is cached on
+  every snapshot and seeds the BehaviorSubject on the next cold start.
+- **Fallback:** Until the Firestore doc is seeded, `Flavor.defaultAppState`
+  points at `https://incil-24-4366.huulo.app/` so the app boots into WebView
+  without Firebase.
+- **OneSignal:** initialized in `bootstrap()`. Click listener routes
+  `additionalData.targetUrl` into `AppShellCubit.handleDeepLink`, which checks
+  the host allowlist and only swaps the WebView when WebView is the active
+  surface — pushes can't bypass emergency/force-update/onboarding.
+
+Full detail: [docs/architecture.md](docs/architecture.md).
 
 ---
 
 ## Conventions
 
-**TBD.** Defaults from `flutter create` apply:
-- `flutter_lints ^5.0.0` (default `analysis_options.yaml`)
-- Standard Dart naming (`lower_snake_case` files, `UpperCamelCase` types)
-- No codegen, no localization, no enforced import style
+- File names `lower_snake_case`; types `UpperCamelCase`.
+- All cubits are sealed-state `Cubit<T>`; state classes extend `Equatable`.
+- Models use **manual `fromJson` / `toJson` / `copyWith`** — no codegen.
+- Localization: `flutter_localizations` + `gen-l10n`, source ARB `l10n/app_de.arb`.
+  Locale is currently `de` only. Access via `AppLocalizations.of(context)`.
+- Lints: default `flutter_lints` set (`analysis_options.yaml`). Generated
+  output (`lib/l10n/**`, `lib/**/*.g.dart`, `lib/config/firebase/**`) excluded.
+
+Full detail: [docs/conventions.md](docs/conventions.md).
 
 ---
 
-## Domain
+## Flavor / env config
 
-**TBD.** App is called **Incil CampApp** — purpose and features not yet defined.
+Hardcoded in `lib/config/flavor.dart`:
 
----
+| Flavor | Bundle ID                       | Firebase project    | OneSignal App ID                       |
+|--------|---------------------------------|---------------------|----------------------------------------|
+| `dev`  | `ch.incil.incilCampApp.dev`     | `incil-campapp-dev` | `028782a9-e433-4e82-8ccb-37b83aeb3b89` |
+| `prod` | `ch.incil.incilCampApp`         | `incil-campapp`     | `3e8f7a53-8b01-4d37-8748-058896c8329b` |
 
-## UI
-
-**TBD.** Default Material theme (`ColorScheme.fromSeed(seedColor: Colors.deepPurple)`). No design tokens, no shared components, no screen skeleton pattern.
-
----
-
-## Git
-
-**TBD.** Currently on `main`, no commits yet, no CONTRIBUTING.md.
-
----
-
-## Tooling
-
-- Flutter pinned via fvm to **3.35.7**.
-- MCP servers come from the **global** config (no project-local `.mcp.json`): `mobile-mcp`, `Framelink_Figma_MCP`, `context7`, `mcp-atlassian`, `gitlab`, Microsoft 365. Verify with `claude mcp list`.
-- mobile-dev plugin skills (Flutter variants) are available for Jira → code, Figma → widget, emulator debugging, analyzer fixes, and smoke testing.
-- No CI/CD configured yet.
-
-See [docs/tooling.md](docs/tooling.md) for full detail.
+Android flavors live in `android/app/build.gradle.kts`. iOS scheme split is a
+manual Xcode step — see [docs/setup.md](docs/setup.md).
 
 ---
 
@@ -84,14 +96,7 @@ See [docs/tooling.md](docs/tooling.md) for full detail.
 
 | File | Contents |
 |------|----------|
-| docs/tooling.md | fvm setup, MCP servers, mobile-dev plugin skills/agents, dev setup, CLI cheatsheet |
-
-The following docs are **not yet created** — generate them by re-running `/mobile-dev:setup` once the relevant decisions are made:
-
-| File | Will cover |
-|------|------------|
-| docs/architecture.md | Folder structure, state mgmt, navigation, DI, data layer, error handling |
-| docs/conventions.md  | Naming, imports, codegen, l10n, testing patterns |
-| docs/domain.md       | App purpose, feature map, glossary, integrations |
-| docs/ui.md           | Design tokens, screen skeleton, shared components |
-| docs/git.md          | Branch model, commit format, PR/MR flow, release flow |
+| [docs/architecture.md](docs/architecture.md) | Folder layout, services, cubits, router, screen-priority logic, data flow |
+| [docs/conventions.md](docs/conventions.md)   | Naming, l10n, testing patterns, codegen scope |
+| [docs/setup.md](docs/setup.md)               | One-time manual steps: Firebase, iOS schemes, OneSignal, Firestore seed |
+| [docs/tooling.md](docs/tooling.md)           | fvm, MCP servers, mobile-dev plugin skills, dev setup, CLI cheatsheet |
