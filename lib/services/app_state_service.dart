@@ -11,10 +11,11 @@ class AppStateService {
   AppStateService({
     required FirebaseFirestore firestore,
     required LocalStorageService storage,
+    AppState? fallback,
   }) : _firestore = firestore,
        _storage = storage,
        _subject = BehaviorSubject<AppState?>.seeded(
-         storage.readCachedAppState(),
+         storage.readCachedAppState() ?? fallback,
        );
 
   final FirebaseFirestore _firestore;

@@ -13,7 +13,7 @@ Future<void> bootstrap(Flavor flavor) async {
 
   await Firebase.initializeApp(options: firebaseOptionsFor(flavor));
 
-  await configureDependencies();
+  await configureDependencies(flavor);
 
   getIt<PushService>().initialize(flavor);
   getIt<AppStateService>().start();
