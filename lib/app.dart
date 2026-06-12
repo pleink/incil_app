@@ -1,52 +1,53 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'config/flavor.dart';
+import 'cubits/app_shell/app_shell_cubit.dart';
+import 'di/service_locator.dart';
 import 'l10n/app_localizations.dart';
+import 'navigation/app_router.dart';
+import 'services/app_state_service.dart';
+import 'services/local_storage_service.dart';
+import 'services/push_service.dart';
+import 'services/version_service.dart';
 import 'style/incil_theme.dart';
 
-class IncilApp extends StatelessWidget {
+class IncilApp extends StatefulWidget {
   const IncilApp({super.key, required this.flavor});
 
   final Flavor flavor;
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: flavor.displayName,
-      debugShowCheckedModeBanner: flavor == Flavor.dev,
-      theme: IncilTheme.light(),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      home: _BootstrapPlaceholder(flavor: flavor),
-    );
-  }
+  State<IncilApp> createState() => _IncilAppState();
 }
 
-class _BootstrapPlaceholder extends StatelessWidget {
-  const _BootstrapPlaceholder({required this.flavor});
+class _IncilAppState extends State<IncilApp> {
+  late final AppShellCubit _cubit = AppShellCubit(
+    appStateService: getIt<AppStateService>(),
+    versionService: getIt<VersionService>(),
+    storage: getIt<LocalStorageService>(),
+    pushService: getIt<PushService>(),
+  );
 
-  final Flavor flavor;
+  late final _router = buildAppRouter(_cubit);
+
+  @override
+  void dispose() {
+    _cubit.close();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const FlutterLogo(size: 96),
-            const SizedBox(height: 16),
-            Text(
-              flavor.displayName,
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Bootstrap placeholder — scaffolded in M1.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-          ],
-        ),
+    return BlocProvider<AppShellCubit>.value(
+      value: _cubit,
+      child: MaterialApp.router(
+        title: widget.flavor.displayName,
+        debugShowCheckedModeBanner: widget.flavor == Flavor.dev,
+        theme: IncilTheme.light(),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        routerConfig: _router,
       ),
     );
   }
