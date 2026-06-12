@@ -82,10 +82,12 @@ Full detail: [docs/conventions.md](docs/conventions.md).
 
 Hardcoded in `lib/config/flavor.dart`:
 
-| Flavor | Bundle ID                       | Firebase project    | OneSignal App ID                       |
-|--------|---------------------------------|---------------------|----------------------------------------|
-| `dev`  | `ch.incil.incilCampApp.dev`     | `incil-campapp-dev` | `028782a9-e433-4e82-8ccb-37b83aeb3b89` |
-| `prod` | `ch.incil.incilCampApp`         | `incil-campapp`     | `3e8f7a53-8b01-4d37-8748-058896c8329b` |
+| Flavor | Android package        | iOS bundle ID         | Firebase project    | OneSignal App ID                       |
+|--------|------------------------|-----------------------|---------------------|----------------------------------------|
+| `dev`  | `ch.incil.camp_app.dev`| `ch.incil.campApp.dev`| `incil-campapp-dev` | `028782a9-e433-4e82-8ccb-37b83aeb3b89` |
+| `prod` | `ch.incil.camp_app`    | `ch.incil.campApp`    | `incil-campapp`     | `3e8f7a53-8b01-4d37-8748-058896c8329b` |
+
+Android uses underscores; iOS uses camelCase because Apple rejects underscores in bundle IDs.
 
 Android flavors live in `android/app/build.gradle.kts`. iOS scheme split is a
 manual Xcode step — see [docs/setup.md](docs/setup.md).

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "284377508149",
+    "project_id": "incil-campapp-dev",
+    "storage_bucket": "incil-campapp-dev.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:284377508149:android:8ccecf1594d8944244047c",
+        "android_client_info": {
+          "package_name": "ch.incil.camp_app.dev"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA49cOD714bygQhfmwGOznxsE-cSuxtHhQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

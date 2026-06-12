@@ -13,6 +13,32 @@ Both flavors point at separate Firebase projects:
 - `dev` → `incil-campapp-dev`
 - `prod` → `incil-campapp`
 
+### Prerequisites (once per machine)
+
+```bash
+# 1. Firebase CLI must be installed and logged in. Without this, flutterfire
+#    configure hangs forever on "Fetching available Firebase projects…".
+firebase login            # opens a browser; pick the Google account that owns the projects
+firebase projects:list    # sanity check — should list incil-campapp-dev and incil-campapp
+
+# 2. flutterfire_cli activated against fvm's Dart (matches the project SDK,
+#    avoids "Invalid kernel binary format version" when invoked via the
+#    pub-cache wrapper).
+fvm dart pub global deactivate flutterfire_cli 2>/dev/null || true
+fvm dart pub global activate flutterfire_cli
+```
+
+If you previously had system Dart in PATH, also make sure fvm's bin is in
+front of it so the pub-cache `flutterfire` wrapper picks up Dart 3.9.2:
+
+```bash
+# Add to ~/.zshrc (already done in this repo's onboarding):
+export PATH="$HOME/fvm/default/bin:$PATH"
+fvm global 3.35.7         # ensures ~/fvm/default points at the right SDK
+```
+
+### Run the configure
+
 ```bash
 dart pub global activate flutterfire_cli
 
@@ -20,8 +46,8 @@ dart pub global activate flutterfire_cli
 flutterfire configure \
   --project=incil-campapp-dev \
   --out=lib/config/firebase/firebase_options_dev.dart \
-  --ios-bundle-id=ch.incil.incilCampApp.dev \
-  --android-package-name=ch.incil.incil_camp_app.dev \
+  --ios-bundle-id=ch.incil.campApp.dev \
+  --android-package-name=ch.incil.camp_app.dev \
   --platforms=ios,android
 
 # Move the per-platform files into the dev sourceset before running prod:
@@ -33,8 +59,8 @@ mv ios/Runner/GoogleService-Info.plist ios/Runner/GoogleService-Info-Dev.plist
 flutterfire configure \
   --project=incil-campapp \
   --out=lib/config/firebase/firebase_options_prod.dart \
-  --ios-bundle-id=ch.incil.incilCampApp \
-  --android-package-name=ch.incil.incil_camp_app \
+  --ios-bundle-id=ch.incil.campApp \
+  --android-package-name=ch.incil.camp_app \
   --platforms=ios,android
 
 mkdir -p android/app/src/prod
@@ -78,7 +104,7 @@ In Xcode → Product → Scheme → Manage Schemes:
 2. In Project settings, duplicate Build Configurations: `Debug-dev`, `Release-dev`,
    `Profile-dev`, plus the matching `*-prod` set.
 3. Create `ios/Flutter/Dev.xcconfig` / `Prod.xcconfig` that set
-   `PRODUCT_BUNDLE_IDENTIFIER` to `ch.incil.incilCampApp.dev` / `ch.incil.incilCampApp`
+   `PRODUCT_BUNDLE_IDENTIFIER` to `ch.incil.camp_app.dev` / `ch.incil.camp_app`
    and `BUNDLE_DISPLAY_NAME` to `Incil CampApp (Dev)` / `Incil CampApp`.
 
 Until this is done, run on iOS without `--flavor`:

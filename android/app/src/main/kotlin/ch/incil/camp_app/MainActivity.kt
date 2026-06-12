@@ -1,4 +1,4 @@
-package ch.incil.incil_camp_app
+package ch.incil.camp_app
 
 import io.flutter.embedding.android.FlutterActivity
 
