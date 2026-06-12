@@ -1,0 +1,43 @@
+{
+  "@@locale": "de",
+
+  "appTitle": "Incil",
+  "@appTitle": {},
+
+  "loadingMessage": "Wird geladen…",
+  "@loadingMessage": {},
+
+  "retry": "Erneut versuchen",
+  "@retry": {},
+
+  "offlineTitle": "Keine Verbindung",
+  "@offlineTitle": {},
+
+  "offlineMessage": "Bitte überprüfe deine Internetverbindung und versuche es erneut.",
+  "@offlineMessage": {},
+
+  "emergencyDefaultTitle": "Notfall",
+  "@emergencyDefaultTitle": {},
+
+  "emergencyLastUpdated": "Aktualisiert: {timestamp}",
+  "@emergencyLastUpdated": {
+    "placeholders": {
+      "timestamp": { "type": "String" }
+    }
+  },
+
+  "forceUpdateDefaultTitle": "Update erforderlich",
+  "@forceUpdateDefaultTitle": {},
+
+  "forceUpdateAction": "Update öffnen",
+  "@forceUpdateAction": {},
+
+  "onboardingNext": "Weiter",
+  "@onboardingNext": {},
+
+  "onboardingSkip": "Überspringen",
+  "@onboardingSkip": {},
+
+  "onboardingDone": "Los geht's",
+  "@onboardingDone": {}
+}
