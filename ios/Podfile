@@ -1,13 +1,19 @@
-# Required for Firebase (≥13) and OneSignal (≥11).
-platform :ios, '13.0'
+# Required for Firebase (cloud_firestore ≥15) and OneSignal (≥11).
+platform :ios, '15.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
 project 'Runner', {
   'Debug' => :debug,
+  'Debug-dev' => :debug,
+  'Debug-prod' => :debug,
   'Profile' => :release,
+  'Profile-dev' => :release,
+  'Profile-prod' => :release,
   'Release' => :release,
+  'Release-dev' => :release,
+  'Release-prod' => :release,
 }
 
 def flutter_root
