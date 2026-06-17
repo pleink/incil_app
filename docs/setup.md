@@ -83,7 +83,7 @@ is processed:
 
 ### iOS GoogleService-Info copy phase
 
-Add a Build Phase "Run Script" *before* "Copy Bundle Resources":
+Add a Build Phase "Run Script" _before_ "Copy Bundle Resources":
 
 ```bash
 case "$CONFIGURATION" in
@@ -93,24 +93,78 @@ esac
 cp -v "$PLIST" "${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/GoogleService-Info.plist"
 ```
 
+Also **remove the plain `GoogleService-Info.plist` file reference** the template
+ships — it shows red in the navigator and sits in Copy Bundle Resources, so the
+build fails with _"Build input file cannot be found"_ until you select it and
+**Remove Reference**. The run script above regenerates the right plist into the
+bundle per flavor.
+
+`bootstrap()` calls `Firebase.initializeApp(options: firebaseOptionsFor(flavor))`
+with explicit Dart options, so the native plist isn't required just to launch —
+this copy phase only matters for native Firebase features (Analytics
+auto-collection, Crashlytics) that read `GoogleService-Info.plist` directly.
+
 ---
 
-## 2. iOS scheme split (Runner-Dev / Runner-Prod)
+## 2. iOS flavor split (Dev / Prod schemes)
 
-Flutter's `--flavor dev` on iOS requires a matching scheme in the Xcode project.
+Unlike Android (flavors live in Gradle), iOS flavors are pure Xcode config — no
+codegen. `--flavor dev` needs a matching **scheme** plus per-flavor **build
+configurations**.
 
-In Xcode → Product → Scheme → Manage Schemes:
-1. Duplicate the default `Runner` scheme twice → `Runner-Dev`, `Runner-Prod`.
-2. In Project settings, duplicate Build Configurations: `Debug-dev`, `Release-dev`,
-   `Profile-dev`, plus the matching `*-prod` set.
-3. Create `ios/Flutter/Dev.xcconfig` / `Prod.xcconfig` that set
-   `PRODUCT_BUNDLE_IDENTIFIER` to `ch.incil.camp_app.dev` / `ch.incil.camp_app`
-   and `BUNDLE_DISPLAY_NAME` to `Incil CampApp (Dev)` / `Incil CampApp`.
+> **Scheme names must be exactly `Dev` / `Prod`** — not `Runner-Dev` /
+> `Runner-Prod`. Flutter 3.35.7 matches `--flavor dev` to a scheme whose name
+> (case-insensitive) **equals** `Dev` (`sentenceCase(flavor)`), so `Runner-Dev`
+> does not match and the build exits with _"You must specify a --flavor
+> option…"_. See `flutter_tools/lib/src/ios/xcodeproj.dart` → `schemeFor`.
 
-Until this is done, run on iOS without `--flavor`:
+In Xcode:
+
+1. **Schemes** (Product → Scheme → Manage Schemes): create two schemes named
+   exactly `Dev` and `Prod`, and tick **Shared** for both (so `xcodebuild -list`
+   finds them). Keep the default `Runner` scheme.
+2. **Build configurations** (PROJECT ▸ Runner → Info → Configurations):
+   duplicate `Debug`/`Release`/`Profile` into the six flavor configs —
+   `Debug-dev`, `Release-dev`, `Profile-dev` and the matching `*-prod` set. The
+   `-dev` / `-prod` suffix is what Flutter matches (`Debug-<flavor>`).
+3. **Bundle IDs** (TARGETS ▸ Runner → Build Settings → _Product Bundle
+   Identifier_), set per configuration:
+   - `Debug-dev` / `Release-dev` / `Profile-dev` → `ch.incil.campApp.dev`
+   - `Debug-prod` / `Release-prod` / `Profile-prod` → `ch.incil.campApp`
+
+   Set this in **Build Settings**, not an `.xcconfig`: the project defines
+   `PRODUCT_BUNDLE_IDENTIFIER` at the target level, which overrides any base
+   `.xcconfig`. iOS bundle IDs are **camelCase** (`campApp`) — Apple rejects the
+   underscores used in the Android package names.
+
+4. **Podfile config map** (`ios/Podfile`): map all nine configs so CocoaPods
+   builds the flavor configs as debug/release correctly:
+
+   ```ruby
+   project 'Runner', {
+     'Debug' => :debug,     'Debug-dev' => :debug,     'Debug-prod' => :debug,
+     'Profile' => :release, 'Profile-dev' => :release, 'Profile-prod' => :release,
+     'Release' => :release, 'Release-dev' => :release, 'Release-prod' => :release,
+   }
+   ```
+
+5. **Deployment target ≥ 15.0** (Firebase `cloud_firestore` minimum): set
+   `platform :ios, '15.0'` in the Podfile and _iOS Deployment Target_ = 15.0 in
+   the project Build Settings.
+
+After `pod install`, CocoaPods prints _"did not set the base configuration …
+your project already has a custom config set"_ for each flavor config. **This is
+expected and harmless** — the flavor Pod xcconfigs are byte-identical to the
+generic `Pods-Runner.debug/release.xcconfig` (flavors share the same pods), and
+`PODS_CONFIGURATION_BUILD_DIR` uses `$(CONFIGURATION)`, so framework paths still
+resolve per-config at build time. If `pod install` instead fails with _"specs
+repository is too out-of-date"_, run `pod install --repo-update` once.
+
+Then both flavors build:
 
 ```bash
-fvm flutter run -t lib/main_dev.dart
+fvm flutter run --flavor dev  -t lib/main_dev.dart
+fvm flutter run --flavor prod -t lib/main_prod.dart
 ```
 
 ---
@@ -118,12 +172,14 @@ fvm flutter run -t lib/main_dev.dart
 ## 3. OneSignal push notifications
 
 App IDs are hardcoded in `lib/config/flavor.dart`:
+
 - dev → `028782a9-e433-4e82-8ccb-37b83aeb3b89`
 - prod → `3e8f7a53-8b01-4d37-8748-058896c8329b`
 
 ### iOS
 
 In Xcode → Runner target → Signing & Capabilities (for **both** schemes):
+
 - Add **Push Notifications**
 - Add **Background Modes** and tick **Remote notifications**
 
@@ -150,9 +206,9 @@ Minimal first document:
 {
   "webviewUrl": "https://incil-24-4366.huulo.app/",
   "allowedHosts": ["incil-24-4366.huulo.app", "huulo.app", "huulo.io"],
-  "emergency":   { "enabled": false },
+  "emergency": { "enabled": false },
   "forceUpdate": { "enabled": false },
-  "onboarding":  { "enabled": false, "version": 1, "slides": [] },
+  "onboarding": { "enabled": false, "version": 1, "slides": [] },
   "oneSignalTags": { "app": "incil", "camp": "incil" }
 }
 ```
