@@ -10,9 +10,10 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// Release signing for the prod flavor only. CI writes android/key.properties +
-// android/app/upload-keystore.jks from secrets; if either is absent the build
-// falls back to debug signing (used by dev flavor and local builds).
+// Release signing. CI writes android/key.properties + android/upload-keystore.p12
+// from secrets; locally the same files sit alongside (gitignored). If either is
+// absent the build falls back to debug signing.
+// storeFile in key.properties is resolved relative to the android/ root.
 val keystorePropertiesFile = rootProject.file("key.properties")
 val keystoreProperties = Properties().apply {
     if (keystorePropertiesFile.exists()) {
@@ -46,7 +47,7 @@ android {
     signingConfigs {
         if (hasReleaseSigning) {
             create("release") {
-                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
                 storePassword = keystoreProperties.getProperty("storePassword")
                 keyAlias = keystoreProperties.getProperty("keyAlias")
                 keyPassword = keystoreProperties.getProperty("keyPassword")

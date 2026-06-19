@@ -44,11 +44,13 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Android release signing (written by CI from secrets; never commit)
+# Android release signing — keystore + key.properties live at android/
+# (gitignored; CI writes them from secrets, locally they're a manual copy)
 /android/key.properties
-/android/app/upload-keystore.jks
-/android/app/*.jks
-/android/app/*.keystore
+/android/upload-keystore.p12
+/android/*.p12
+/android/*.jks
+/android/*.keystore
 
 # iOS / Xcode
 ios/Pods/
