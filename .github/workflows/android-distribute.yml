@@ -1,0 +1,103 @@
+name: Android distribute
+
+on:
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+
+concurrency:
+  group: android-distribute-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-distribute:
+    name: Build & distribute (${{ github.ref_name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve flavor matrix
+        run: |
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            echo "FLAVOR=prod" >> "$GITHUB_ENV"
+            echo "ENTRY=lib/main_prod.dart" >> "$GITHUB_ENV"
+            echo "FIREBASE_APP_ID=${{ secrets.FIREBASE_ANDROID_APP_ID_PROD }}" >> "$GITHUB_ENV"
+            echo "TESTER_GROUP=prod-testers" >> "$GITHUB_ENV"
+            echo "SIGN_RELEASE=true" >> "$GITHUB_ENV"
+          else
+            echo "FLAVOR=dev" >> "$GITHUB_ENV"
+            echo "ENTRY=lib/main_dev.dart" >> "$GITHUB_ENV"
+            echo "FIREBASE_APP_ID=${{ secrets.FIREBASE_ANDROID_APP_ID_DEV }}" >> "$GITHUB_ENV"
+            echo "TESTER_GROUP=dev-testers" >> "$GITHUB_ENV"
+            echo "SIGN_RELEASE=false" >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.35.7
+          channel: stable
+          cache: true
+
+      - name: Decode keystore (prod only)
+        if: env.SIGN_RELEASE == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+          cat > android/key.properties <<EOF
+          storeFile=upload-keystore.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build release APK
+        run: |
+          flutter build apk \
+            --flavor "$FLAVOR" \
+            -t "$ENTRY" \
+            --release \
+            --build-number=${{ github.run_number }}
+
+      - name: Locate APK
+        id: apk
+        run: |
+          APK_PATH="build/app/outputs/flutter-apk/app-${FLAVOR}-release.apk"
+          if [[ ! -f "$APK_PATH" ]]; then
+            echo "APK not found at $APK_PATH" >&2
+            ls -la build/app/outputs/flutter-apk/ || true
+            exit 1
+          fi
+          echo "path=$APK_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to Firebase App Distribution
+        uses: wzieba/Firebase-Distribution-Github-Action@v1
+        with:
+          appId: ${{ env.FIREBASE_APP_ID }}
+          serviceCredentialsFileContent: ${{ github.ref == 'refs/heads/main' && secrets.FIREBASE_SA_PROD || secrets.FIREBASE_SA_DEV }}
+          groups: ${{ env.TESTER_GROUP }}
+          file: ${{ steps.apk.outputs.path }}
+          releaseNotes: |
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Run:    #${{ github.run_number }}
+            Message: ${{ github.event.head_commit.message }}
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ env.FLAVOR }}-release-${{ github.run_number }}.apk
+          path: ${{ steps.apk.outputs.path }}
+          retention-days: 90

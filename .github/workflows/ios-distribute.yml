@@ -1,0 +1,122 @@
+# iOS distribution — SKELETON (not yet active)
+#
+# Before flipping the trigger from `workflow_dispatch` to `push: branches: [dev, main]`,
+# complete these prerequisites:
+#
+#   1. In Xcode, create shared schemes `Runner-Dev` and `Runner-Prod`.
+#      See docs/setup.md for the build-configuration matrix
+#      (Debug-dev / Release-dev / Profile-dev + prod variants).
+#   2. Configure signing — either:
+#        (a) fastlane match against a private match repo, OR
+#        (b) store p12 + provisioning profile as base64 secrets and import them in CI.
+#   3. Add GitHub secrets:
+#        FIREBASE_IOS_APP_ID_DEV   = 1:284377508149:ios:a61eb4b153eb8c7044047c
+#        FIREBASE_IOS_APP_ID_PROD  = 1:898123562619:ios:62b057911d13f692eb6cde
+#        IOS_P12_BASE64            (base64 of the distribution .p12)
+#        IOS_P12_PASSWORD
+#        IOS_PROVISIONING_PROFILE_DEV_BASE64
+#        IOS_PROVISIONING_PROFILE_PROD_BASE64
+#        IOS_KEYCHAIN_PASSWORD     (ephemeral keychain password)
+#   4. Add an ExportOptions.plist per flavor under ios/ (manual export method, team ID, provisioning profile names).
+#   5. Flip the trigger below and remove this banner.
+
+name: iOS distribute (skeleton)
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ios-distribute-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-distribute:
+    name: Build & distribute (${{ github.ref_name }})
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve flavor matrix
+        run: |
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            echo "FLAVOR=prod" >> "$GITHUB_ENV"
+            echo "ENTRY=lib/main_prod.dart" >> "$GITHUB_ENV"
+            echo "FIREBASE_APP_ID=${{ secrets.FIREBASE_IOS_APP_ID_PROD }}" >> "$GITHUB_ENV"
+            echo "TESTER_GROUP=prod-testers" >> "$GITHUB_ENV"
+            echo "EXPORT_OPTIONS=ios/ExportOptions-prod.plist" >> "$GITHUB_ENV"
+          else
+            echo "FLAVOR=dev" >> "$GITHUB_ENV"
+            echo "ENTRY=lib/main_dev.dart" >> "$GITHUB_ENV"
+            echo "FIREBASE_APP_ID=${{ secrets.FIREBASE_IOS_APP_ID_DEV }}" >> "$GITHUB_ENV"
+            echo "TESTER_GROUP=dev-testers" >> "$GITHUB_ENV"
+            echo "EXPORT_OPTIONS=ios/ExportOptions-dev.plist" >> "$GITHUB_ENV"
+          fi
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.35.7
+          channel: stable
+          cache: true
+
+      # TODO: Install signing assets here.
+      # Example using p12 + provisioning profile from secrets:
+      #
+      # - name: Set up signing
+      #   env:
+      #     P12_BASE64: ${{ secrets.IOS_P12_BASE64 }}
+      #     P12_PASSWORD: ${{ secrets.IOS_P12_PASSWORD }}
+      #     PROFILE_BASE64: ${{ github.ref == 'refs/heads/main' && secrets.IOS_PROVISIONING_PROFILE_PROD_BASE64 || secrets.IOS_PROVISIONING_PROFILE_DEV_BASE64 }}
+      #     KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
+      #   run: |
+      #     echo "$P12_BASE64" | base64 --decode > /tmp/cert.p12
+      #     echo "$PROFILE_BASE64" | base64 --decode > /tmp/profile.mobileprovision
+      #     security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+      #     security default-keychain -s build.keychain
+      #     security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+      #     security import /tmp/cert.p12 -k build.keychain -P "$P12_PASSWORD" -A
+      #     security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+      #     mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+      #     cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build IPA
+        run: |
+          flutter build ipa \
+            --flavor "$FLAVOR" \
+            -t "$ENTRY" \
+            --release \
+            --build-number=${{ github.run_number }} \
+            --export-options-plist="$EXPORT_OPTIONS"
+
+      - name: Locate IPA
+        id: ipa
+        run: |
+          IPA_PATH="$(find build/ios/ipa -maxdepth 1 -name '*.ipa' | head -n 1)"
+          if [[ -z "$IPA_PATH" ]]; then
+            echo "IPA not found under build/ios/ipa/" >&2
+            ls -la build/ios/ipa/ || true
+            exit 1
+          fi
+          echo "path=$IPA_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to Firebase App Distribution
+        uses: wzieba/Firebase-Distribution-Github-Action@v1
+        with:
+          appId: ${{ env.FIREBASE_APP_ID }}
+          serviceCredentialsFileContent: ${{ github.ref == 'refs/heads/main' && secrets.FIREBASE_SA_PROD || secrets.FIREBASE_SA_DEV }}
+          groups: ${{ env.TESTER_GROUP }}
+          file: ${{ steps.ipa.outputs.path }}
+          releaseNotes: |
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Run:    #${{ github.run_number }}
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ env.FLAVOR }}-${{ github.run_number }}.ipa
+          path: ${{ steps.ipa.outputs.path }}
+          retention-days: 90
