@@ -43,13 +43,13 @@ jobs:
             echo "FLAVOR=prod" >> "$GITHUB_ENV"
             echo "ENTRY=lib/main_prod.dart" >> "$GITHUB_ENV"
             echo "FIREBASE_APP_ID=${{ secrets.FIREBASE_IOS_APP_ID_PROD }}" >> "$GITHUB_ENV"
-            echo "TESTER_GROUP=prod-testers" >> "$GITHUB_ENV"
+            echo "TESTER_GROUP=prod-tester" >> "$GITHUB_ENV"
             echo "EXPORT_OPTIONS=ios/ExportOptions-prod.plist" >> "$GITHUB_ENV"
           else
             echo "FLAVOR=dev" >> "$GITHUB_ENV"
             echo "ENTRY=lib/main_dev.dart" >> "$GITHUB_ENV"
             echo "FIREBASE_APP_ID=${{ secrets.FIREBASE_IOS_APP_ID_DEV }}" >> "$GITHUB_ENV"
-            echo "TESTER_GROUP=dev-testers" >> "$GITHUB_ENV"
+            echo "TESTER_GROUP=dev-tester" >> "$GITHUB_ENV"
             echo "EXPORT_OPTIONS=ios/ExportOptions-dev.plist" >> "$GITHUB_ENV"
           fi
 
