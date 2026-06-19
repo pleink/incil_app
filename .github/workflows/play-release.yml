@@ -1,0 +1,94 @@
+name: Play Store release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: play-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-upload:
+    name: Build AAB & upload to Play (internal/draft)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Derive version from tag
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"           # v1.2.3
+          VERSION_NAME="${TAG#v}"                  # 1.2.3
+          VERSION_CODE=$((100 + GITHUB_RUN_NUMBER))
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "Tag $TAG → versionName=$VERSION_NAME, versionCode=$VERSION_CODE"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.35.7
+          channel: stable
+          cache: true
+
+      - name: Decode upload keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/upload-keystore.p12
+          cat > android/key.properties <<EOF
+          storeFile=upload-keystore.p12
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build prod AAB
+        run: |
+          flutter build appbundle \
+            --flavor prod \
+            -t lib/main_prod.dart \
+            --release \
+            --build-name="$VERSION_NAME" \
+            --build-number="$VERSION_CODE"
+
+      - name: Locate AAB
+        id: aab
+        run: |
+          AAB_PATH="build/app/outputs/bundle/prodRelease/app-prod-release.aab"
+          if [[ ! -f "$AAB_PATH" ]]; then
+            echo "AAB not found at $AAB_PATH" >&2
+            find build/app/outputs/bundle -type f || true
+            exit 1
+          fi
+          echo "path=$AAB_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to Play Console (internal, draft)
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SA_JSON }}
+          packageName: ch.incil.camp_app
+          releaseFiles: ${{ steps.aab.outputs.path }}
+          track: internal
+          status: draft
+          releaseName: ${{ env.VERSION_NAME }} (${{ env.VERSION_CODE }})
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-prod-${{ env.VERSION_NAME }}-${{ env.VERSION_CODE }}.aab
+          path: ${{ steps.aab.outputs.path }}
+          retention-days: 90
