@@ -1,0 +1,11 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Public-read onboarding assets; uploads happen via admin tooling only.
+    match /onboarding/{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}
