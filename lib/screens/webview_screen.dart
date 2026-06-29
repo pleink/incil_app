@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -12,6 +13,10 @@ import '../services/connectivity_service.dart';
 import '../services/url_service.dart';
 import '../util/host_allowlist.dart';
 import '../widgets/loading_view.dart';
+
+const _iosSpoofedUserAgent =
+    'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 '
+    '(KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36';
 
 class WebViewScreen extends StatelessWidget {
   const WebViewScreen({
@@ -69,8 +74,13 @@ class _WebViewViewState extends State<_WebViewView> {
           },
           onNavigationRequest: _handleNavigation,
         ),
-      )
-      ..loadRequest(Uri.parse(widget.url));
+      );
+
+    if (Platform.isIOS) {
+      _controller.setUserAgent(_iosSpoofedUserAgent);
+    }
+
+    _controller.loadRequest(Uri.parse(widget.url));
 
     _connectivity.isOnline().then((online) => _wasOnline = online);
     _connSub = _connectivity.onlineStream.listen((online) {
