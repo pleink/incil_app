@@ -18,6 +18,7 @@ class AppShellCubit extends Cubit<AppShellState> {
     required LocalStorageService storage,
     required PushService pushService,
     required ConnectivityService connectivity,
+    Duration minSplashDuration = const Duration(seconds: 2),
     Duration splashTimeout = const Duration(seconds: 8),
   }) : _appStateService = appStateService,
        _versionService = versionService,
@@ -30,6 +31,15 @@ class AppShellCubit extends Cubit<AppShellState> {
       _onConnectivityChanged,
     );
     _connectivity.isOnline().then((online) => _isOnline = online);
+
+    // Hold the branded splash for a beat so cached/fallback data can't resolve
+    // it away before it's seen. The first Firestore snapshot and OneSignal init
+    // run in the background meanwhile.
+    if (minSplashDuration > Duration.zero) {
+      _minSplashTimer = Timer(minSplashDuration, _onMinSplashElapsed);
+    } else {
+      _minSplashElapsed = true;
+    }
 
     if (_appStateService.current != null) {
       _onAppState(_appStateService.current);
@@ -47,6 +57,8 @@ class AppShellCubit extends Cubit<AppShellState> {
   StreamSubscription<AppState?>? _subscription;
   StreamSubscription<bool>? _connSubscription;
   Timer? _splashTimer;
+  Timer? _minSplashTimer;
+  bool _minSplashElapsed = false;
   String? _lastTagsSignature;
   bool _isOnline = true;
 
@@ -54,13 +66,22 @@ class AppShellCubit extends Cubit<AppShellState> {
     if (state is AppShellSplash) emit(const AppShellOffline());
   }
 
+  void _onMinSplashElapsed() {
+    _minSplashElapsed = true;
+    final current = _appStateService.current;
+    if (current != null) _resolveAndEmit(current);
+  }
+
   void _onAppState(AppState? appState) {
+    if (appState == null) return;
+    _maybeApplyTags(appState.oneSignalTags);
+    if (!_minSplashElapsed) return;
+    _resolveAndEmit(appState);
+  }
+
+  void _resolveAndEmit(AppState appState) {
     _splashTimer?.cancel();
     _splashTimer = null;
-
-    if (appState == null) return;
-
-    _maybeApplyTags(appState.oneSignalTags);
     final next = _resolve(appState);
     emit(next);
     if (next is AppShellWebView) _maybeRequestPushPermission();
@@ -162,6 +183,7 @@ class AppShellCubit extends Cubit<AppShellState> {
   @override
   Future<void> close() async {
     _splashTimer?.cancel();
+    _minSplashTimer?.cancel();
     await _subscription?.cancel();
     await _connSubscription?.cancel();
     return super.close();
