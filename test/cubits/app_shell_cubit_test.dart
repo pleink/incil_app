@@ -92,15 +92,18 @@ void main() {
     connController.close();
   });
 
-  AppShellCubit build({Duration splashTimeout = const Duration(seconds: 8)}) =>
-      AppShellCubit(
-        appStateService: appStateService,
-        versionService: versionService,
-        storage: storage,
-        pushService: pushService,
-        connectivity: connectivity,
-        splashTimeout: splashTimeout,
-      );
+  AppShellCubit build({
+    Duration minSplashDuration = Duration.zero,
+    Duration splashTimeout = const Duration(seconds: 8),
+  }) => AppShellCubit(
+    appStateService: appStateService,
+    versionService: versionService,
+    storage: storage,
+    pushService: pushService,
+    connectivity: connectivity,
+    minSplashDuration: minSplashDuration,
+    splashTimeout: splashTimeout,
+  );
 
   group('initial state', () {
     test('starts on Splash when AppStateService has no cached state', () {
@@ -114,6 +117,35 @@ void main() {
       final cubit = build();
       expect(cubit.state, isA<AppShellWebView>());
       cubit.close();
+    });
+  });
+
+  group('minimum splash duration', () {
+    test('holds on Splash until the minimum elapses even when data is ready', () async {
+      when(() => appStateService.current).thenReturn(_state());
+      final cubit = build(minSplashDuration: const Duration(milliseconds: 80));
+
+      expect(cubit.state, isA<AppShellSplash>());
+      await Future<void>.delayed(const Duration(milliseconds: 140));
+      expect(cubit.state, isA<AppShellWebView>());
+
+      await cubit.close();
+    });
+
+    test('resolves the freshest state once the minimum elapses', () async {
+      final cubit = build(minSplashDuration: const Duration(milliseconds: 80));
+      controller.add(
+        _state(emergency: const EmergencyConfig(enabled: true, title: 'E')),
+      );
+      when(() => appStateService.current).thenReturn(
+        _state(emergency: const EmergencyConfig(enabled: true, title: 'E')),
+      );
+
+      expect(cubit.state, isA<AppShellSplash>());
+      await Future<void>.delayed(const Duration(milliseconds: 140));
+      expect(cubit.state, isA<AppShellEmergency>());
+
+      await cubit.close();
     });
   });
 

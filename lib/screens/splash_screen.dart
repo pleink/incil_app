@@ -1,29 +1,33 @@
-import 'package:flutter/material.dart';
+import 'dart:math';
 
-import '../l10n/app_localizations.dart';
-import '../style/incil_spacing.dart';
-import '../widgets/incil_logo.dart';
-import '../widgets/loading_view.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+
+final _background = 'assets/splash/splash_${Random().nextInt(6) + 1}.jpg';
 
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const IncilLogo(size: 120),
-              const SizedBox(height: IncilSpacing.xl),
-              Text(l.appTitle, style: Theme.of(context).textTheme.displayLarge),
-              const SizedBox(height: IncilSpacing.xxl),
-              LoadingView(message: l.loadingMessage),
-            ],
-          ),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: const Color(0xFF1A140D),
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(_background, fit: BoxFit.cover),
+            const ColoredBox(color: Color(0x66000000)),
+            Center(
+              child: SvgPicture.asset(
+                'assets/logo/incil_logo.svg',
+                width: 240,
+                semanticsLabel: 'incil',
+              ),
+            ),
+          ],
         ),
       ),
     );
