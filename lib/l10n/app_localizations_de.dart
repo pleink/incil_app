@@ -28,6 +28,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get emergencyDefaultTitle => 'Notfall';
 
   @override
+  String get emergencyCallButton => 'Notfallnummer anrufen';
+
+  @override
   String emergencyLastUpdated(String timestamp) {
     return 'Aktualisiert: $timestamp';
   }

@@ -206,7 +206,7 @@ Minimal first document:
 {
   "webviewUrl": "https://incil-24-4366.huulo.app/",
   "allowedHosts": ["incil-24-4366.huulo.app", "huulo.app", "huulo.io"],
-  "emergency": { "enabled": false },
+  "emergency": { "enabled": false, "title": "", "subtitle": "", "body1": "", "contact": "", "body2": "", "footer": "" },
   "forceUpdate": { "enabled": false },
   "onboarding": { "enabled": false, "version": 1, "slides": [] },
   "oneSignalTags": { "app": "incil", "camp": "incil" }
