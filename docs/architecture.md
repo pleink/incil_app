@@ -86,7 +86,7 @@ All in one scope (`lib/di/service_locator.dart`). No scope ladder.
 | `Flavor` | singleton | Current flavor, read by any service that needs the OneSignal ID / Firebase project / default URL |
 | `SharedPreferences` | singleton | Underlying KV store |
 | `LocalStorageService` | singleton | Typed access to `completedOnboardingVersion` + cached AppState JSON |
-| `VersionService` | singleton | `currentBuild` from package_info_plus + `mustForceUpdate(config)` |
+| `VersionService` | singleton | `mustForceUpdate(config)`: compares the installed build (package_info_plus) against the per-platform minimum (`minIosBuildNumber` / `minAndroidVersionCode`); disabled config, missing platform minimum, or unparseable build number disables the gate (fail-open) |
 | `ConnectivityService` | lazySingleton | `isOnline()` + `onlineStream` from connectivity_plus |
 | `UrlService` | lazySingleton | `openExternal(Uri)`, `dial(phone)` via url_launcher |
 | `PushService` | lazySingleton | OneSignal `initialize`, `requestPermission`, `applyTags`; exposes `onTargetUrl` callback |

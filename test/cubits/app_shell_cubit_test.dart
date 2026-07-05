@@ -124,7 +124,10 @@ void main() {
       act: (c) => controller.add(
         _state(
           emergency: const EmergencyConfig(enabled: true, title: 'E'),
-          forceUpdate: const ForceUpdateConfig(enabled: true, minIosBuild: 999),
+          forceUpdate: const ForceUpdateConfig(
+            enabled: true,
+            minIosBuildNumber: 999,
+          ),
           onboarding: const OnboardingConfig(
             enabled: true,
             version: 5,
@@ -143,7 +146,10 @@ void main() {
       },
       act: (c) => controller.add(
         _state(
-          forceUpdate: const ForceUpdateConfig(enabled: true, minIosBuild: 999),
+          forceUpdate: const ForceUpdateConfig(
+            enabled: true,
+            minIosBuildNumber: 999,
+          ),
           onboarding: const OnboardingConfig(
             enabled: true,
             version: 5,
@@ -152,6 +158,25 @@ void main() {
         ),
       ),
       verify: (c) => expect(c.state, isA<AppShellForceUpdate>()),
+    );
+
+    blocTest<AppShellCubit, AppShellState>(
+      'enabled force-update falls through to WebView when VersionService '
+      'does not mandate it (gating fully delegated)',
+      build: build, // default stub: mustForceUpdate -> false
+      act: (c) => controller.add(
+        _state(
+          forceUpdate: const ForceUpdateConfig(
+            enabled: true,
+            minIosBuildNumber: 999,
+            minAndroidVersionCode: 999,
+          ),
+        ),
+      ),
+      verify: (c) {
+        expect(c.state, isA<AppShellWebView>());
+        verify(() => versionService.mustForceUpdate(any())).called(1);
+      },
     );
 
     blocTest<AppShellCubit, AppShellState>(

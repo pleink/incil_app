@@ -3,8 +3,8 @@ import 'package:equatable/equatable.dart';
 class ForceUpdateConfig extends Equatable {
   const ForceUpdateConfig({
     required this.enabled,
-    this.minIosBuild,
-    this.minAndroidBuild,
+    this.minIosBuildNumber,
+    this.minAndroidVersionCode,
     this.title,
     this.message,
     this.iosStoreUrl,
@@ -12,8 +12,8 @@ class ForceUpdateConfig extends Equatable {
   });
 
   final bool enabled;
-  final int? minIosBuild;
-  final int? minAndroidBuild;
+  final int? minIosBuildNumber;
+  final int? minAndroidVersionCode;
   final String? title;
   final String? message;
   final String? iosStoreUrl;
@@ -24,8 +24,8 @@ class ForceUpdateConfig extends Equatable {
   factory ForceUpdateConfig.fromJson(Map<String, dynamic> json) {
     return ForceUpdateConfig(
       enabled: json['enabled'] as bool? ?? false,
-      minIosBuild: (json['minIosBuild'] as num?)?.toInt(),
-      minAndroidBuild: (json['minAndroidBuild'] as num?)?.toInt(),
+      minIosBuildNumber: (json['minIosBuildNumber'] as num?)?.toInt(),
+      minAndroidVersionCode: (json['minAndroidVersionCode'] as num?)?.toInt(),
       title: json['title'] as String?,
       message: json['message'] as String?,
       iosStoreUrl: json['iosStoreUrl'] as String?,
@@ -35,8 +35,9 @@ class ForceUpdateConfig extends Equatable {
 
   Map<String, dynamic> toJson() => {
     'enabled': enabled,
-    if (minIosBuild != null) 'minIosBuild': minIosBuild,
-    if (minAndroidBuild != null) 'minAndroidBuild': minAndroidBuild,
+    if (minIosBuildNumber != null) 'minIosBuildNumber': minIosBuildNumber,
+    if (minAndroidVersionCode != null)
+      'minAndroidVersionCode': minAndroidVersionCode,
     if (title != null) 'title': title,
     if (message != null) 'message': message,
     if (iosStoreUrl != null) 'iosStoreUrl': iosStoreUrl,
@@ -46,8 +47,8 @@ class ForceUpdateConfig extends Equatable {
   @override
   List<Object?> get props => [
     enabled,
-    minIosBuild,
-    minAndroidBuild,
+    minIosBuildNumber,
+    minAndroidVersionCode,
     title,
     message,
     iosStoreUrl,
