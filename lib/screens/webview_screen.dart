@@ -82,6 +82,16 @@ class _WebViewViewState extends State<_WebViewView> {
   }
 
   @override
+  void didUpdateWidget(covariant _WebViewView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // The shell cubit swaps the URL in place (e.g. a push deep link while the
+    // WebView is already visible) — reload without recreating the controller.
+    if (widget.url != oldWidget.url) {
+      _controller.loadRequest(Uri.parse(widget.url));
+    }
+  }
+
+  @override
   void dispose() {
     _connSub?.cancel();
     super.dispose();

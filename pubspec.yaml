@@ -46,6 +46,7 @@ dev_dependencies:
   go_router_builder: ^3.0.1
 
   bloc_test: ^10.0.0
+  webview_flutter_platform_interface: ^2.15.1
   mocktail: ^1.0.4
 
 flutter:

@@ -8,9 +8,38 @@ import '../config/flavor.dart';
 typedef PushTargetHandler = void Function(Uri uri);
 
 class PushService {
-  PushService({this.onTargetUrl});
+  PushService({PushTargetHandler? onTargetUrl}) : _onTargetUrl = onTargetUrl;
 
-  PushTargetHandler? onTargetUrl;
+  PushTargetHandler? _onTargetUrl;
+
+  /// Buffers the last click target that arrived before a handler was attached
+  /// (cold start: the OneSignal click listener is registered in `bootstrap()`
+  /// but the handler is only attached in `IncilApp.initState`).
+  Uri? _bufferedTarget;
+
+  /// Attaching a handler flushes any buffered cold-start click target.
+  set onTargetUrl(PushTargetHandler? handler) {
+    _onTargetUrl = handler;
+    if (handler == null) return;
+    final buffered = _bufferedTarget;
+    if (buffered == null) return;
+    // Clear before calling so a re-entrant set can't double-fire.
+    _bufferedTarget = null;
+    handler(buffered);
+  }
+
+  void _dispatchTarget(Uri uri) {
+    final handler = _onTargetUrl;
+    if (handler != null) {
+      handler(uri);
+    } else {
+      // Last-write-wins while nobody is listening yet.
+      _bufferedTarget = uri;
+    }
+  }
+
+  @visibleForTesting
+  void debugDispatchTarget(Uri uri) => _dispatchTarget(uri);
 
   bool _initialized = false;
 
@@ -28,7 +57,7 @@ class PushService {
       if (raw is! String) return;
       final uri = Uri.tryParse(raw);
       if (uri == null) return;
-      onTargetUrl?.call(uri);
+      _dispatchTarget(uri);
     });
   }
 
