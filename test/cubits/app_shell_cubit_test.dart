@@ -156,7 +156,10 @@ void main() {
       act: (c) => controller.add(
         _state(
           emergency: const EmergencyConfig(enabled: true, title: 'E'),
-          forceUpdate: const ForceUpdateConfig(enabled: true, minIosBuild: 999),
+          forceUpdate: const ForceUpdateConfig(
+            enabled: true,
+            minIosBuildNumber: 999,
+          ),
           onboarding: const OnboardingConfig(
             enabled: true,
             version: 5,
@@ -175,7 +178,10 @@ void main() {
       },
       act: (c) => controller.add(
         _state(
-          forceUpdate: const ForceUpdateConfig(enabled: true, minIosBuild: 999),
+          forceUpdate: const ForceUpdateConfig(
+            enabled: true,
+            minIosBuildNumber: 999,
+          ),
           onboarding: const OnboardingConfig(
             enabled: true,
             version: 5,
@@ -184,6 +190,25 @@ void main() {
         ),
       ),
       verify: (c) => expect(c.state, isA<AppShellForceUpdate>()),
+    );
+
+    blocTest<AppShellCubit, AppShellState>(
+      'enabled force-update falls through to WebView when VersionService '
+      'does not mandate it (gating fully delegated)',
+      build: build, // default stub: mustForceUpdate -> false
+      act: (c) => controller.add(
+        _state(
+          forceUpdate: const ForceUpdateConfig(
+            enabled: true,
+            minIosBuildNumber: 999,
+            minAndroidVersionCode: 999,
+          ),
+        ),
+      ),
+      verify: (c) {
+        expect(c.state, isA<AppShellWebView>());
+        verify(() => versionService.mustForceUpdate(any())).called(1);
+      },
     );
 
     blocTest<AppShellCubit, AppShellState>(
@@ -425,6 +450,250 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 50));
 
         verifyNever(() => appStateService.retry());
+        await cubit.close();
+      },
+    );
+  });
+
+  group('deep link queueing', () {
+    final target = Uri.parse('https://incil.huulo.io/program/42');
+
+    test(
+      'link during Splash is queued and applied on the first snapshot',
+      () async {
+        final cubit = build();
+        expect(cubit.state, isA<AppShellSplash>());
+
+        cubit.handleDeepLink(target);
+        expect(cubit.state, isA<AppShellSplash>());
+
+        controller.add(_state());
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+
+        expect((cubit.state as AppShellWebView).url, target.toString());
+        await cubit.close();
+      },
+    );
+
+    test(
+      'link while Emergency is queued and applied once emergency lifts',
+      () async {
+        final cubit = build();
+        controller.add(
+          _state(emergency: const EmergencyConfig(enabled: true, title: 'E')),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        expect(cubit.state, isA<AppShellEmergency>());
+
+        cubit.handleDeepLink(target);
+        expect(cubit.state, isA<AppShellEmergency>());
+
+        controller.add(_state());
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+
+        expect((cubit.state as AppShellWebView).url, target.toString());
+        await cubit.close();
+      },
+    );
+
+    test('link while Onboarding is queued and applied after '
+        'markOnboardingCompleted', () async {
+      final onboardingState = _state(
+        onboarding: const OnboardingConfig(
+          enabled: true,
+          version: 3,
+          slides: [OnboardingSlide(title: 't', body: 'b')],
+        ),
+      );
+      when(() => appStateService.current).thenReturn(onboardingState);
+      final cubit = build();
+      expect(cubit.state, isA<AppShellOnboarding>());
+
+      cubit.handleDeepLink(target);
+      expect(cubit.state, isA<AppShellOnboarding>());
+
+      when(() => storage.completedOnboardingVersion).thenReturn(3);
+      await cubit.markOnboardingCompleted(3);
+
+      expect((cubit.state as AppShellWebView).url, target.toString());
+      await cubit.close();
+    });
+
+    test('applied link survives an identical follow-up snapshot and is not '
+        're-applied (URL stability)', () async {
+      final cubit = build();
+      cubit.handleDeepLink(target);
+
+      controller.add(_state());
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect((cubit.state as AppShellWebView).url, target.toString());
+
+      // Routine Firestore churn: same config URL — must not yank the user
+      // back to the home page, and the consumed link must not re-apply.
+      controller.add(_state());
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect((cubit.state as AppShellWebView).url, target.toString());
+
+      // A real config URL change DOES navigate away.
+      controller.add(_state(webviewUrl: 'https://incil.huulo.io/new'));
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(
+        (cubit.state as AppShellWebView).url,
+        'https://incil.huulo.io/new',
+      );
+      await cubit.close();
+    });
+
+    test('disallowed host is dropped at apply time and not resurrected by '
+        'later snapshots', () async {
+      final cubit = build();
+      cubit.handleDeepLink(Uri.parse('https://evil.example.com/foo'));
+
+      controller.add(_state());
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(
+        (cubit.state as AppShellWebView).url,
+        'https://incil.huulo.io/app',
+      );
+
+      controller.add(_state());
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(
+        (cubit.state as AppShellWebView).url,
+        'https://incil.huulo.io/app',
+      );
+      await cubit.close();
+    });
+
+    test('last-write-wins when two links are queued before apply', () async {
+      final cubit = build();
+      cubit.handleDeepLink(Uri.parse('https://incil.huulo.io/first'));
+      cubit.handleDeepLink(Uri.parse('https://incil.huulo.io/second'));
+
+      controller.add(_state());
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect(
+        (cubit.state as AppShellWebView).url,
+        'https://incil.huulo.io/second',
+      );
+      await cubit.close();
+    });
+
+    test('apply-time validation uses the snapshot allowlist, not the '
+        'receive-time one', () async {
+      // current == null at receive-time → no allowlist available yet.
+      final cubit = build();
+      cubit.handleDeepLink(Uri.parse('https://other.huulo.io/x'));
+
+      controller.add(
+        _state(allowedHosts: const ['incil.huulo.io', 'other.huulo.io']),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect((cubit.state as AppShellWebView).url, 'https://other.huulo.io/x');
+      await cubit.close();
+    });
+
+    test(
+      'link while ForceUpdate is queued and applied once the block lifts',
+      () async {
+        when(() => versionService.mustForceUpdate(any())).thenReturn(true);
+        final cubit = build();
+        controller.add(
+          _state(
+            forceUpdate: const ForceUpdateConfig(
+              enabled: true,
+              minIosBuildNumber: 999,
+            ),
+          ),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        expect(cubit.state, isA<AppShellForceUpdate>());
+
+        cubit.handleDeepLink(target);
+        expect(cubit.state, isA<AppShellForceUpdate>());
+
+        // Force-update lifted (e.g. config lowered the minimum version).
+        when(() => versionService.mustForceUpdate(any())).thenReturn(false);
+        controller.add(_state());
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+
+        expect((cubit.state as AppShellWebView).url, target.toString());
+        await cubit.close();
+      },
+    );
+
+    test(
+      'queued link with a non-http(s) scheme is dropped at apply time',
+      () async {
+        final cubit = build();
+        cubit.handleDeepLink(Uri.parse('tel:+41791234567'));
+
+        controller.add(_state());
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+
+        expect(
+          (cubit.state as AppShellWebView).url,
+          'https://incil.huulo.io/app',
+        );
+        await cubit.close();
+      },
+    );
+
+    test('immediately rejected link (disallowed host while WebView active) '
+        'is NOT queued and does not resurface on later snapshots', () async {
+      when(() => appStateService.current).thenReturn(_state());
+      final cubit = build();
+      expect(cubit.state, isA<AppShellWebView>());
+
+      cubit.handleDeepLink(Uri.parse('https://evil.example.com/foo'));
+      expect(
+        (cubit.state as AppShellWebView).url,
+        'https://incil.huulo.io/app',
+      );
+
+      // Even with the disallowed host now allowed, a rejected immediate
+      // link must not have been queued for later application.
+      controller.add(
+        _state(allowedHosts: const ['incil.huulo.io', 'evil.example.com']),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(
+        (cubit.state as AppShellWebView).url,
+        'https://incil.huulo.io/app',
+      );
+      await cubit.close();
+    });
+
+    test('immediate apply with a non-http(s) scheme leaves the WebView URL '
+        'unchanged', () async {
+      when(() => appStateService.current).thenReturn(_state());
+      final cubit = build();
+      expect(cubit.state, isA<AppShellWebView>());
+
+      cubit.handleDeepLink(Uri.parse('mailto:hi@incil.huulo.io'));
+      expect(
+        (cubit.state as AppShellWebView).url,
+        'https://incil.huulo.io/app',
+      );
+      await cubit.close();
+    });
+
+    test(
+      'link queued while Offline is applied after retryFromOffline',
+      () async {
+        final cubit = build(splashTimeout: const Duration(milliseconds: 30));
+        await Future<void>.delayed(const Duration(milliseconds: 80));
+        expect(cubit.state, isA<AppShellOffline>());
+
+        cubit.handleDeepLink(target);
+        expect(cubit.state, isA<AppShellOffline>());
+
+        when(() => appStateService.current).thenReturn(_state());
+        await cubit.retryFromOffline();
+
+        expect((cubit.state as AppShellWebView).url, target.toString());
         await cubit.close();
       },
     );

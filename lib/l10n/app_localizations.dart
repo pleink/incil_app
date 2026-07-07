@@ -130,6 +130,12 @@ abstract class AppLocalizations {
   /// **'Notfall'**
   String get emergencyDefaultTitle;
 
+  /// No description provided for @emergencyCallButton.
+  ///
+  /// In de, this message translates to:
+  /// **'Notfallnummer anrufen'**
+  String get emergencyCallButton;
+
   /// No description provided for @emergencyLastUpdated.
   ///
   /// In de, this message translates to:

@@ -20,7 +20,10 @@ class EmergencyScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final urls = getIt<UrlService>();
 
-    final title = config.title ?? l.emergencyDefaultTitle;
+    final title = _hasText(config.title)
+        ? config.title!
+        : l.emergencyDefaultTitle;
+    final callablePhone = config.callablePhone;
     final updatedAt = config.updatedAt;
 
     return Scaffold(
@@ -28,76 +31,92 @@ class EmergencyScreen extends StatelessWidget {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(IncilSpacing.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: IncilSpacing.xl),
-              const Icon(
-                Icons.warning_amber_rounded,
-                color: IncilColors.onEmergency,
-                size: 72,
-              ),
-              const SizedBox(height: IncilSpacing.lg),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.displayLarge?.copyWith(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: IncilSpacing.xl),
+                const Icon(
+                  Icons.warning_amber_rounded,
                   color: IncilColors.onEmergency,
+                  size: 72,
                 ),
-              ),
-              if (config.message != null) ...[
-                const SizedBox(height: IncilSpacing.md),
+                const SizedBox(height: IncilSpacing.lg),
                 Text(
-                  config.message!,
+                  title,
                   textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyLarge?.copyWith(
+                  style: theme.textTheme.displayLarge?.copyWith(
                     color: IncilColors.onEmergency,
                   ),
                 ),
-              ],
-              const Spacer(),
-              if (updatedAt != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: IncilSpacing.md),
-                  child: Text(
+                if (_hasText(config.subtitle)) ...[
+                  const SizedBox(height: IncilSpacing.sm),
+                  Text(
+                    config.subtitle!,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: IncilColors.onEmergency,
+                    ),
+                  ),
+                ],
+                if (_hasText(config.body1)) ...[
+                  const SizedBox(height: IncilSpacing.md),
+                  Text(
+                    config.body1!,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: IncilColors.onEmergency,
+                    ),
+                  ),
+                ],
+                if (callablePhone != null) ...[
+                  const SizedBox(height: IncilSpacing.lg),
+                  PrimaryButton(
+                    label: l.emergencyCallButton,
+                    icon: Icons.phone,
+                    onPressed: () => urls.dial(callablePhone),
+                  ),
+                ],
+                if (_hasText(config.body2)) ...[
+                  const SizedBox(height: IncilSpacing.lg),
+                  Text(
+                    config.body2!,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: IncilColors.onEmergency,
+                    ),
+                  ),
+                ],
+                if (_hasText(config.footer)) ...[
+                  const SizedBox(height: IncilSpacing.lg),
+                  Text(
+                    config.footer!,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: IncilColors.onEmergency.withValues(alpha: 0.8),
+                    ),
+                  ),
+                ],
+                if (updatedAt != null) ...[
+                  const SizedBox(height: IncilSpacing.md),
+                  Text(
                     l.emergencyLastUpdated(_formatTimestamp(updatedAt)),
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: IncilColors.onEmergency.withValues(alpha: 0.8),
                     ),
                   ),
-                ),
-              if (config.primaryActionPhone != null &&
-                  config.primaryActionLabel != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: IncilSpacing.sm),
-                  child: PrimaryButton(
-                    label: config.primaryActionLabel!,
-                    icon: Icons.phone,
-                    onPressed: () => urls.dial(config.primaryActionPhone!),
-                  ),
-                ),
-              if (config.secondaryActionUrl != null &&
-                  config.secondaryActionLabel != null)
-                OutlinedButton.icon(
-                  onPressed: () {
-                    final uri = Uri.tryParse(config.secondaryActionUrl!);
-                    if (uri != null) urls.openExternal(uri);
-                  },
-                  icon: const Icon(Icons.map_outlined),
-                  label: Text(config.secondaryActionLabel!),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: IncilColors.onEmergency,
-                    side: const BorderSide(color: IncilColors.onEmergency),
-                    minimumSize: const Size.fromHeight(48),
-                  ),
-                ),
-            ],
+                ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+
+  static bool _hasText(String? value) =>
+      value != null && value.trim().isNotEmpty;
 
   String _formatTimestamp(DateTime dt) {
     // Format uses only numeric tokens — no locale data required.

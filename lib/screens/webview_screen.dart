@@ -12,6 +12,7 @@ import '../di/service_locator.dart';
 import '../services/connectivity_service.dart';
 import '../services/url_service.dart';
 import '../util/host_allowlist.dart';
+import '../util/webview_popup_scripts.dart';
 import '../widgets/loading_view.dart';
 
 const _iosSpoofedUserAgent =
@@ -63,8 +64,16 @@ class _WebViewViewState extends State<_WebViewView> {
       ..setBackgroundColor(Colors.transparent)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageStarted: (_) => cubit.onPageStarted(),
-          onPageFinished: (_) => cubit.onPageFinished(),
+          onPageStarted: (_) {
+            // Seed consent keys before the huulo bundle runs so the cookie
+            // banner and web push prompt never mount (issue #18).
+            _controller.runJavaScript(WebViewPopupScripts.preseedConsent);
+            cubit.onPageStarted();
+          },
+          onPageFinished: (_) {
+            _controller.runJavaScript(WebViewPopupScripts.dismissPopups);
+            cubit.onPageFinished();
+          },
           onWebResourceError: (err) {
             // Only main-frame errors should trip the offline fallback; ignore
             // sub-resource hiccups (favicons, ads, …) that the page can survive.
@@ -89,6 +98,16 @@ class _WebViewViewState extends State<_WebViewView> {
       if (online && !_wasOnline) _controller.reload();
       _wasOnline = online;
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant _WebViewView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // The shell cubit swaps the URL in place (e.g. a push deep link while the
+    // WebView is already visible) — reload without recreating the controller.
+    if (widget.url != oldWidget.url) {
+      _controller.loadRequest(Uri.parse(widget.url));
+    }
   }
 
   @override
