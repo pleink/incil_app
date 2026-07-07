@@ -19,6 +19,9 @@
   "emergencyDefaultTitle": "Notfall",
   "@emergencyDefaultTitle": {},
 
+  "emergencyCallButton": "Notfallnummer anrufen",
+  "@emergencyCallButton": {},
+
   "emergencyLastUpdated": "Aktualisiert: {timestamp}",
   "@emergencyLastUpdated": {
     "placeholders": {

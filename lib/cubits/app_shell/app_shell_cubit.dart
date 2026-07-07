@@ -50,6 +50,15 @@ class AppShellCubit extends Cubit<AppShellState> {
   String? _lastTagsSignature;
   bool _isOnline = true;
 
+  /// Deep link waiting for the shell to resolve to WebView (in-memory only).
+  /// Validated against the allowlist at apply-time, not receive-time.
+  Uri? _pendingDeepLink;
+
+  /// Last `webviewUrl` seen from config. Lets us tell a routine Firestore
+  /// snapshot (same config URL → keep whatever URL the user navigated to,
+  /// e.g. an applied deep link) apart from a real config change.
+  String? _lastConfigWebviewUrl;
+
   void _onSplashTimeout() {
     if (state is AppShellSplash) emit(const AppShellOffline());
   }
@@ -98,6 +107,38 @@ class AppShellCubit extends Cubit<AppShellState> {
     if (!_appStateService.hasRealData && !_isOnline) {
       return const AppShellOffline();
     }
+    return _resolveWebView(appState);
+  }
+
+  AppShellState _resolveWebView(AppState appState) {
+    // Consume the pending deep link unconditionally — whether it is applied
+    // or rejected by the allowlist, it must not resurface on later snapshots.
+    final pending = _pendingDeepLink;
+    _pendingDeepLink = null;
+
+    final configUrlUnchanged = appState.webviewUrl == _lastConfigWebviewUrl;
+    _lastConfigWebviewUrl = appState.webviewUrl;
+
+    if (pending != null && isHostAllowed(pending, appState.allowedHosts)) {
+      return AppShellWebView(
+        url: pending.toString(),
+        allowedHosts: appState.allowedHosts,
+        oneSignalTags: appState.oneSignalTags,
+      );
+    }
+
+    // URL stability: on a routine snapshot with an unchanged config URL,
+    // preserve the currently displayed URL (which may be a deep link) so
+    // Firestore churn doesn't yank the user back to the home page.
+    final current = state;
+    if (current is AppShellWebView && configUrlUnchanged) {
+      return AppShellWebView(
+        url: current.url,
+        allowedHosts: appState.allowedHosts,
+        oneSignalTags: appState.oneSignalTags,
+      );
+    }
+
     return AppShellWebView(
       url: appState.webviewUrl,
       allowedHosts: appState.allowedHosts,
@@ -129,11 +170,15 @@ class AppShellCubit extends Cubit<AppShellState> {
 
   void handleDeepLink(Uri uri) {
     final current = _appStateService.current;
-    if (current == null) return;
+    // Only act immediately when the WebView is the active surface — emergency /
+    // force-update / onboarding take precedence and a push must not bypass
+    // them. Otherwise queue the link (last-write-wins) and apply it once the
+    // shell resolves to WebView; the allowlist check happens at apply-time.
+    if (current == null || state is! AppShellWebView) {
+      _pendingDeepLink = uri;
+      return;
+    }
     if (!isHostAllowed(uri, current.allowedHosts)) return;
-    // Only act when the WebView is the active surface — emergency / force-update
-    // / onboarding take precedence and we don't want a push to bypass them.
-    if (state is! AppShellWebView) return;
     emit(
       AppShellWebView(
         url: uri.toString(),
