@@ -11,6 +11,7 @@ import '../di/service_locator.dart';
 import '../services/connectivity_service.dart';
 import '../services/url_service.dart';
 import '../util/host_allowlist.dart';
+import '../util/webview_popup_scripts.dart';
 import '../widgets/loading_view.dart';
 
 class WebViewScreen extends StatelessWidget {
@@ -58,8 +59,16 @@ class _WebViewViewState extends State<_WebViewView> {
       ..setBackgroundColor(Colors.transparent)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageStarted: (_) => cubit.onPageStarted(),
-          onPageFinished: (_) => cubit.onPageFinished(),
+          onPageStarted: (_) {
+            // Seed consent keys before the huulo bundle runs so the cookie
+            // banner and web push prompt never mount (issue #18).
+            _controller.runJavaScript(WebViewPopupScripts.preseedConsent);
+            cubit.onPageStarted();
+          },
+          onPageFinished: (_) {
+            _controller.runJavaScript(WebViewPopupScripts.dismissPopups);
+            cubit.onPageFinished();
+          },
           onWebResourceError: (err) {
             // Only main-frame errors should trip the offline fallback; ignore
             // sub-resource hiccups (favicons, ads, …) that the page can survive.
