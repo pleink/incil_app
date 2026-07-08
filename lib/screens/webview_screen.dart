@@ -163,26 +163,39 @@ class _WebViewViewState extends State<_WebViewView> {
               _swapUrl((state as AppShellWebView).url),
         ),
       ],
-      child: Scaffold(
-        body: SafeArea(
-          child: Stack(
-            children: [
-              WebViewWidget(controller: _controller),
-              BlocBuilder<WebViewCubit, WebViewState>(
-                builder: (context, state) => state is WebViewLoading
-                    ? ColoredBox(
-                        color: Theme.of(context).colorScheme.surface,
-                        child: Center(
-                          child: LoadingView(
-                            message: AppLocalizations.of(
-                              context,
-                            ).webviewLoadingMessage,
+      // System back (Android button/gesture) walks the in-WebView history
+      // instead of popping the single-entry go_router stack, which would
+      // close the app. At the WebView root the press is swallowed on
+      // purpose; screen switches are redirect-driven, never pop-driven.
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) async {
+          if (didPop) return;
+          if (await _controller.canGoBack()) {
+            await _controller.goBack();
+          }
+        },
+        child: Scaffold(
+          body: SafeArea(
+            child: Stack(
+              children: [
+                WebViewWidget(controller: _controller),
+                BlocBuilder<WebViewCubit, WebViewState>(
+                  builder: (context, state) => state is WebViewLoading
+                      ? ColoredBox(
+                          color: Theme.of(context).colorScheme.surface,
+                          child: Center(
+                            child: LoadingView(
+                              message: AppLocalizations.of(
+                                context,
+                              ).webviewLoadingMessage,
+                            ),
                           ),
-                        ),
-                      )
-                    : const SizedBox.shrink(),
-              ),
-            ],
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ],
+            ),
           ),
         ),
       ),
