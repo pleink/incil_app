@@ -106,6 +106,12 @@ abstract class AppLocalizations {
   /// **'Wird geladen…'**
   String get loadingMessage;
 
+  /// No description provided for @webviewLoadingMessage.
+  ///
+  /// In de, this message translates to:
+  /// **'App-Inhalte werden geladen…'**
+  String get webviewLoadingMessage;
+
   /// No description provided for @retry.
   ///
   /// In de, this message translates to:

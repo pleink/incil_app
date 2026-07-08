@@ -15,6 +15,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get loadingMessage => 'Wird geladen…';
 
   @override
+  String get webviewLoadingMessage => 'App-Inhalte werden geladen…';
+
+  @override
   String get retry => 'Erneut versuchen';
 
   @override

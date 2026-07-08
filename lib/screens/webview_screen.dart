@@ -9,6 +9,7 @@ import '../cubits/app_shell/app_shell_cubit.dart';
 import '../cubits/webview/webview_cubit.dart';
 import '../cubits/webview/webview_state.dart';
 import '../di/service_locator.dart';
+import '../l10n/app_localizations.dart';
 import '../services/connectivity_service.dart';
 import '../services/url_service.dart';
 import '../util/host_allowlist.dart';
@@ -140,8 +141,17 @@ class _WebViewViewState extends State<_WebViewView> {
             children: [
               WebViewWidget(controller: _controller),
               BlocBuilder<WebViewCubit, WebViewState>(
-                builder: (_, state) => state is WebViewLoading
-                    ? const Center(child: LoadingView())
+                builder: (context, state) => state is WebViewLoading
+                    ? ColoredBox(
+                        color: Theme.of(context).colorScheme.surface,
+                        child: Center(
+                          child: LoadingView(
+                            message: AppLocalizations.of(
+                              context,
+                            ).webviewLoadingMessage,
+                          ),
+                        ),
+                      )
                     : const SizedBox.shrink(),
               ),
             ],
