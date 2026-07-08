@@ -30,12 +30,17 @@ class ForceUpdateConfig extends Equatable {
           ?.toInt(),
       minAndroidVersionCode:
           ((json['minAndroidVersionCode'] ?? json['android']) as num?)?.toInt(),
-      title: json['title'] as String?,
-      message: json['message'] as String?,
-      iosStoreUrl: json['iosStoreUrl'] as String?,
-      androidStoreUrl: json['androidStoreUrl'] as String?,
+      title: _nonEmpty(json['title'] as String?),
+      message: _nonEmpty(json['message'] as String?),
+      iosStoreUrl: _nonEmpty(json['iosStoreUrl'] as String?),
+      androidStoreUrl: _nonEmpty(json['androidStoreUrl'] as String?),
     );
   }
+
+  /// Firestore consoles make it easy to leave a field as `""`; treat that
+  /// the same as absent so defaults/fallbacks apply.
+  static String? _nonEmpty(String? value) =>
+      (value == null || value.trim().isEmpty) ? null : value;
 
   Map<String, dynamic> toJson() => {
     'enabled': enabled,

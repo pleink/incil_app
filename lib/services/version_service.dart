@@ -23,6 +23,15 @@ class VersionService {
   /// Null when [PackageInfo.buildNumber] is not a valid integer.
   int? get buildNumberOrNull => int.tryParse(_packageInfo.buildNumber);
 
+  /// Store page for this app, used when the Firestore `forceUpdate` doc
+  /// carries no explicit URL. Only derivable on Android — the Play Store
+  /// listing is addressed by package name. iOS needs the numeric App Store
+  /// ID, so it must come from Firestore (`iosStoreUrl`).
+  String? get storeUrlFallback => _isIos
+      ? null
+      : 'https://play.google.com/store/apps/details'
+            '?id=${_packageInfo.packageName}';
+
   bool mustForceUpdate(ForceUpdateConfig config) {
     if (!config.enabled) return false;
     final required = _isIos

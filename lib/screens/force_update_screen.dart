@@ -6,6 +6,7 @@ import '../di/service_locator.dart';
 import '../l10n/app_localizations.dart';
 import '../models/force_update_config.dart';
 import '../services/url_service.dart';
+import '../services/version_service.dart';
 import '../style/incil_spacing.dart';
 import '../widgets/incil_logo.dart';
 import '../widgets/primary_button.dart';
@@ -22,9 +23,11 @@ class ForceUpdateScreen extends StatelessWidget {
     final urls = getIt<UrlService>();
 
     final title = config.title ?? l.forceUpdateDefaultTitle;
-    final storeUrl = Platform.isIOS
-        ? config.iosStoreUrl
-        : config.androidStoreUrl;
+    // Configured URL wins; otherwise fall back to the store page derived
+    // from the package name (Android only) so the button stays tappable.
+    final storeUrl =
+        (Platform.isIOS ? config.iosStoreUrl : config.androidStoreUrl) ??
+        getIt<VersionService>().storeUrlFallback;
 
     return Scaffold(
       body: SafeArea(
