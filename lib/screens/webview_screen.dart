@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../cubits/app_shell/app_shell_cubit.dart';
+import '../cubits/app_shell/app_shell_state.dart';
 import '../cubits/webview/webview_cubit.dart';
 import '../cubits/webview/webview_state.dart';
 import '../di/service_locator.dart';
@@ -56,6 +57,14 @@ class _WebViewViewState extends State<_WebViewView> {
   StreamSubscription<bool>? _connSub;
   bool _wasOnline = true;
 
+  /// The URL currently loaded in the controller. Tracked here because URL
+  /// swaps can arrive through two channels: a widget rebuild (config change)
+  /// or an AppShellCubit emission (push deep link) — see the BlocListener in
+  /// [build]. The latter is required: go_router skips the route rebuild when
+  /// the location stays `/webview`, so `didUpdateWidget` alone never sees
+  /// deep links that arrive while the WebView is already on screen.
+  late String _currentUrl;
+
   @override
   void initState() {
     super.initState();
@@ -90,7 +99,8 @@ class _WebViewViewState extends State<_WebViewView> {
       _controller.setUserAgent(_iosSpoofedUserAgent);
     }
 
-    _controller.loadRequest(Uri.parse(widget.url));
+    _currentUrl = widget.url;
+    _controller.loadRequest(Uri.parse(_currentUrl));
 
     _connectivity.isOnline().then((online) => _wasOnline = online);
     _connSub = _connectivity.onlineStream.listen((online) {
@@ -104,11 +114,17 @@ class _WebViewViewState extends State<_WebViewView> {
   @override
   void didUpdateWidget(covariant _WebViewView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // The shell cubit swaps the URL in place (e.g. a push deep link while the
-    // WebView is already visible) — reload without recreating the controller.
     if (widget.url != oldWidget.url) {
-      _controller.loadRequest(Uri.parse(widget.url));
+      _swapUrl(widget.url);
     }
+  }
+
+  /// Loads [url] without recreating the controller; no-op when it is already
+  /// the current URL (e.g. the same swap arriving via both channels).
+  void _swapUrl(String url) {
+    if (url == _currentUrl) return;
+    _currentUrl = url;
+    _controller.loadRequest(Uri.parse(url));
   }
 
   @override
@@ -129,12 +145,24 @@ class _WebViewViewState extends State<_WebViewView> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<WebViewCubit, WebViewState>(
-      listenWhen: (prev, curr) => curr is WebViewFailed,
-      listener: (context, state) {
-        // Hand the failure to the shell cubit, which will switch to /offline.
-        context.read<AppShellCubit>().reportWebViewFailure();
-      },
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<WebViewCubit, WebViewState>(
+          listenWhen: (prev, curr) => curr is WebViewFailed,
+          listener: (context, state) {
+            // Hand the failure to the shell cubit, which switches to /offline.
+            context.read<AppShellCubit>().reportWebViewFailure();
+          },
+        ),
+        // Push deep links: the shell cubit emits a new AppShellWebView with the
+        // target URL, but go_router won't rebuild this route (location is
+        // unchanged), so apply the swap directly from the state stream.
+        BlocListener<AppShellCubit, AppShellState>(
+          listenWhen: (prev, curr) => curr is AppShellWebView,
+          listener: (context, state) =>
+              _swapUrl((state as AppShellWebView).url),
+        ),
+      ],
       child: Scaffold(
         body: SafeArea(
           child: Stack(
