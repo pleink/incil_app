@@ -74,7 +74,8 @@ class _OnboardingViewState extends State<_OnboardingView> {
             controller: _controller,
             itemCount: slides.length,
             onPageChanged: cubit.goTo,
-            itemBuilder: (_, i) => _Slide(slide: slides[i]),
+            itemBuilder: (_, i) =>
+                _Slide(slide: slides[i], active: i == pageState.index),
           ),
           Positioned(
             top: 0,
@@ -205,8 +206,13 @@ class _LogoCard extends StatelessWidget {
 }
 
 class _Slide extends StatefulWidget {
-  const _Slide({required this.slide});
+  const _Slide({required this.slide, required this.active});
   final OnboardingSlide slide;
+
+  /// Whether this slide is the current page. PageView pre-builds neighbours
+  /// during the swipe, so the entrance animation must wait for activation
+  /// instead of firing on build.
+  final bool active;
 
   @override
   State<_Slide> createState() => _SlideState();
@@ -217,11 +223,32 @@ class _SlideState extends State<_Slide> with SingleTickerProviderStateMixin {
   late final AnimationController _bubbleController = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 350),
-  )..forward();
+  );
   late final Animation<double> _bubbleScale = CurvedAnimation(
     parent: _bubbleController,
     curve: Curves.easeOutBack,
   );
+  late final Animation<double> _bubbleFade = CurvedAnimation(
+    parent: _bubbleController,
+    curve: Curves.easeOut,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.active) _bubbleController.forward();
+  }
+
+  @override
+  void didUpdateWidget(covariant _Slide oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Replay the entrance every time this slide becomes the current page.
+    // The outgoing slide keeps its finished animation so it doesn't blink
+    // while it scrolls away.
+    if (widget.active && !oldWidget.active) {
+      _bubbleController.forward(from: 0);
+    }
+  }
 
   @override
   void dispose() {
@@ -262,7 +289,7 @@ class _SlideState extends State<_Slide> with SingleTickerProviderStateMixin {
                   scale: _bubbleScale,
                   alignment: Alignment.topLeft,
                   child: FadeTransition(
-                    opacity: _bubbleController,
+                    opacity: _bubbleFade,
                     // Message-bubble illusion: hug the left edge and leave a
                     // gap on the right instead of spanning the full width.
                     child: Container(
