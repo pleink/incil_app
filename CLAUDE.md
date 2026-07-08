@@ -10,8 +10,9 @@ Detailed references: [Architecture](docs/architecture.md) · [Conventions](docs/
 
 **Incil CampApp** is a branded Flutter mobile shell around a huulo.io WebView.
 Native screens cover splash, onboarding, emergency, force-update, and offline;
-everything else is the WebView. Remote control comes from a single Firestore
-document (`apps/incil/config/app_state`). Push notifications go through
+everything else is the WebView. Remote control comes from the Firestore
+`config` collection (one document per concern: `webview`, `allowedHosts`,
+`emergency`, `forceUpdate`, `onboarding`, `oneSignalTags`). Push notifications go through
 OneSignal. Platforms: **iOS + Android only**.
 
 Read [docs/architecture.md](docs/architecture.md) for the full spine and
@@ -48,8 +49,10 @@ fvm flutter build ios      --flavor prod -t lib/main_prod.dart
 - **One Firestore listener** (`AppStateService`) feeds `AppShellCubit`, which
   resolves the screen-priority decision:
   `emergency > forceUpdate > onboarding > webview`. A `GoRouter.redirect`
-  watches the cubit and snaps to the right path. `AppShellOffline` is reached
-  either by an 8s splash timeout with no data, or by a WebView load failure.
+  watches the cubit and snaps to the right path. The splash holds for the
+  first fresh Firestore snapshot (a cached seed alone won't resolve it); the
+  8s timeout falls back to the cached state. `AppShellOffline` is reached
+  either by that timeout with no data at all, or by a WebView load failure.
 - **Offline cache:** SharedPreferences. Last good Firestore doc is cached on
   every snapshot and seeds the BehaviorSubject on the next cold start.
 - **Fallback:** Until the Firestore doc is seeded, `Flavor.defaultAppState`
