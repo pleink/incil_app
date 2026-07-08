@@ -196,28 +196,36 @@ notifications still arrive but show a default Android icon.
 
 ## 4. Firestore document seed
 
-Create the `apps/incil/config/app_state` document with the shape described in
-the project brief. Until this doc exists, the app uses the `defaultAppState`
-fallback in `Flavor` (currently points at `https://incil-24-4366.huulo.app/`).
+Seed the flat `config` collection — one document per concern. Until these
+docs exist, the app uses the `defaultAppState` fallback in `Flavor`
+(currently points at `https://incil-24-4366.huulo.app/`).
 
-Minimal first document:
+Minimal seed documents:
 
 ```json
-{
-  "webviewUrl": "https://incil-24-4366.huulo.app/",
-  "allowedHosts": ["incil-24-4366.huulo.app", "huulo.app", "huulo.io"],
-  "emergency": { "enabled": false, "title": "", "subtitle": "", "body1": "", "contact": "", "body2": "", "footer": "" },
-  "forceUpdate": { "enabled": false, "minAndroidVersionCode": 1, "minIosBuildNumber": 1, "title": "", "message": "", "androidStoreUrl": "", "iosStoreUrl": "" },
-  "onboarding": { "enabled": false, "version": 1, "slides": [] },
-  "oneSignalTags": { "app": "incil", "camp": "incil" }
-}
+// config/webview
+{ "url": "https://incil-24-4366.huulo.app/" }
+
+// config/allowedHosts
+{ "urls": ["incil-24-4366.huulo.app", "huulo.app", "huulo.io"] }
+
+// config/emergency
+{ "enabled": false, "title": "", "subtitle": "", "body1": "", "contact": "", "body2": "", "footer": "" }
+
+// config/forceUpdate  (short keys; the long minIosBuildNumber /
+// minAndroidVersionCode names are also accepted)
+{ "enabled": false, "ios": 0, "android": 0 }
+
+// config/onboarding
+{ "enabled": false, "version": 1, "slides": [] }
+
+// config/oneSignalTags
+{ "app": "incil", "camp": "incil" }
 ```
 
-Firestore security rules (read-only for the app):
+Firestore security rules live in `firestore.rules` at the repo root
+(read-only for the app). Deploy with:
 
-```js
-match /apps/incil/config/{document} {
-  allow read: if true;
-  allow write: if false;
-}
+```bash
+firebase deploy --only firestore:rules --project <project-id>
 ```

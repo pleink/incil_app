@@ -22,7 +22,7 @@ class AppStateService {
   final FirebaseFirestore _firestore;
   final LocalStorageService _storage;
   final BehaviorSubject<AppState?> _subject;
-  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _sub;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sub;
   bool _hasFirestoreData;
 
   /// True once a Firestore snapshot has been successfully parsed, or true at
@@ -30,7 +30,10 @@ class AppStateService {
   /// when the cubit is running purely on the `Flavor.defaultAppState` fallback.
   bool get hasRealData => _hasFirestoreData;
 
-  static const _docPath = 'apps/incil/config/app_state';
+  /// Flat remote-control collection: one document per concern
+  /// (webview, allowedHosts, emergency, forceUpdate, onboarding,
+  /// oneSignalTags).
+  static const _collectionPath = 'config';
 
   Stream<AppState?> get stream => _subject.stream;
   AppState? get current => _subject.valueOrNull;
@@ -38,7 +41,7 @@ class AppStateService {
   void start() {
     if (_sub != null) return;
     _sub = _firestore
-        .doc(_docPath)
+        .collection(_collectionPath)
         .snapshots()
         .listen(
           _onSnapshot,
@@ -54,12 +57,11 @@ class AppStateService {
         );
   }
 
-  Future<void> _onSnapshot(DocumentSnapshot<Map<String, dynamic>> snap) async {
-    if (!snap.exists) return;
-    final data = snap.data();
-    if (data == null) return;
+  Future<void> _onSnapshot(QuerySnapshot<Map<String, dynamic>> snap) async {
+    if (snap.docs.isEmpty) return;
+    final docs = {for (final doc in snap.docs) doc.id: doc.data()};
     try {
-      final state = AppState.fromJson(data);
+      final state = AppState.fromConfigDocs(docs);
       await _storage.writeCachedAppState(state);
       _hasFirestoreData = true;
       _subject.add(state);
