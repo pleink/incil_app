@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/flavor.dart';
 import '../services/app_state_service.dart';
 import '../services/connectivity_service.dart';
+import '../services/image_prewarm_service.dart';
 import '../services/local_storage_service.dart';
 import '../services/push_service.dart';
 import '../services/url_service.dart';
@@ -25,6 +26,7 @@ Future<void> configureDependencies(Flavor flavor) async {
     ..registerSingleton<VersionService>(version)
     ..registerLazySingleton<ConnectivityService>(ConnectivityService.new)
     ..registerLazySingleton<UrlService>(UrlService.new)
+    ..registerLazySingleton<ImagePrewarmService>(ImagePrewarmService.new)
     ..registerLazySingleton<PushService>(PushService.new)
     ..registerLazySingleton<FirebaseFirestore>(() => FirebaseFirestore.instance)
     ..registerLazySingleton<AppStateService>(

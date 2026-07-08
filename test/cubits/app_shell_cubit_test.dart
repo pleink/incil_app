@@ -13,6 +13,7 @@ import 'package:incil_camp_app/models/onboarding_config.dart';
 import 'package:incil_camp_app/models/onboarding_slide.dart';
 import 'package:incil_camp_app/services/app_state_service.dart';
 import 'package:incil_camp_app/services/connectivity_service.dart';
+import 'package:incil_camp_app/services/image_prewarm_service.dart';
 import 'package:incil_camp_app/services/local_storage_service.dart';
 import 'package:incil_camp_app/services/push_service.dart';
 import 'package:incil_camp_app/services/version_service.dart';
@@ -26,6 +27,8 @@ class _LocalStorageServiceMock extends Mock implements LocalStorageService {}
 class _PushServiceMock extends Mock implements PushService {}
 
 class _ConnectivityServiceMock extends Mock implements ConnectivityService {}
+
+class _ImagePrewarmServiceMock extends Mock implements ImagePrewarmService {}
 
 AppState _state({
   EmergencyConfig emergency = EmergencyConfig.empty,
@@ -49,6 +52,7 @@ void main() {
   setUpAll(() {
     registerFallbackValue(_ForceUpdateConfigFake());
     registerFallbackValue(<String, String>{});
+    registerFallbackValue(<String>[]);
   });
 
   late _AppStateServiceMock appStateService;
@@ -56,6 +60,7 @@ void main() {
   late _LocalStorageServiceMock storage;
   late _PushServiceMock pushService;
   late _ConnectivityServiceMock connectivity;
+  late _ImagePrewarmServiceMock imagePrewarm;
   late StreamController<AppState?> controller;
   late StreamController<bool> connController;
 
@@ -65,12 +70,14 @@ void main() {
     storage = _LocalStorageServiceMock();
     pushService = _PushServiceMock();
     connectivity = _ConnectivityServiceMock();
+    imagePrewarm = _ImagePrewarmServiceMock();
     controller = StreamController<AppState?>.broadcast();
     connController = StreamController<bool>.broadcast();
 
     when(() => appStateService.stream).thenAnswer((_) => controller.stream);
     when(() => appStateService.current).thenReturn(null);
     when(() => appStateService.hasRealData).thenReturn(true);
+    when(() => appStateService.hasFreshData).thenReturn(true);
     when(() => appStateService.retry()).thenAnswer((_) async {});
     when(() => versionService.mustForceUpdate(any())).thenReturn(false);
     when(() => storage.completedOnboardingVersion).thenReturn(0);
@@ -82,6 +89,7 @@ void main() {
     when(() => pushService.applyTags(any())).thenAnswer((_) async {});
     when(() => pushService.requestPermission()).thenAnswer((_) async {});
     when(() => connectivity.isOnline()).thenAnswer((_) async => true);
+    when(() => imagePrewarm.prewarm(any())).thenAnswer((_) async {});
     when(
       () => connectivity.onlineStream,
     ).thenAnswer((_) => connController.stream);
@@ -101,6 +109,7 @@ void main() {
     storage: storage,
     pushService: pushService,
     connectivity: connectivity,
+    imagePrewarm: imagePrewarm,
     minSplashDuration: minSplashDuration,
     splashTimeout: splashTimeout,
   );
@@ -121,16 +130,21 @@ void main() {
   });
 
   group('minimum splash duration', () {
-    test('holds on Splash until the minimum elapses even when data is ready', () async {
-      when(() => appStateService.current).thenReturn(_state());
-      final cubit = build(minSplashDuration: const Duration(milliseconds: 80));
+    test(
+      'holds on Splash until the minimum elapses even when data is ready',
+      () async {
+        when(() => appStateService.current).thenReturn(_state());
+        final cubit = build(
+          minSplashDuration: const Duration(milliseconds: 80),
+        );
 
-      expect(cubit.state, isA<AppShellSplash>());
-      await Future<void>.delayed(const Duration(milliseconds: 140));
-      expect(cubit.state, isA<AppShellWebView>());
+        expect(cubit.state, isA<AppShellSplash>());
+        await Future<void>.delayed(const Duration(milliseconds: 140));
+        expect(cubit.state, isA<AppShellWebView>());
 
-      await cubit.close();
-    });
+        await cubit.close();
+      },
+    );
 
     test('resolves the freshest state once the minimum elapses', () async {
       final cubit = build(minSplashDuration: const Duration(milliseconds: 80));
@@ -276,6 +290,93 @@ void main() {
         await cubit.close();
       },
     );
+
+    test('holds on Splash past min duration when only cached data exists, then '
+        'resolves the fresh snapshot once it arrives', () async {
+      // Cached state says webview; the fresh snapshot enables onboarding.
+      when(() => appStateService.hasFreshData).thenReturn(false);
+      when(() => appStateService.current).thenReturn(_state());
+      final cubit = build(splashTimeout: const Duration(seconds: 8));
+
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(
+        cubit.state,
+        isA<AppShellSplash>(),
+        reason: 'cached data alone must not resolve the splash',
+      );
+
+      when(() => appStateService.hasFreshData).thenReturn(true);
+      final fresh = _state(
+        onboarding: const OnboardingConfig(
+          enabled: true,
+          version: 1,
+          slides: [OnboardingSlide(title: 't', body: 'b')],
+        ),
+      );
+      when(() => appStateService.current).thenReturn(fresh);
+      controller.add(fresh);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(cubit.state, isA<AppShellOnboarding>());
+      await cubit.close();
+    });
+
+    test(
+      'holds on Splash until the onboarding slide images are prewarmed',
+      () async {
+        final prewarmCompleter = Completer<void>();
+        when(
+          () => imagePrewarm.prewarm(any()),
+        ).thenAnswer((_) => prewarmCompleter.future);
+
+        final cubit = build();
+        controller.add(
+          _state(
+            onboarding: const OnboardingConfig(
+              enabled: true,
+              version: 1,
+              slides: [
+                OnboardingSlide(
+                  title: 't',
+                  body: 'b',
+                  imageUrl: 'https://example.com/slide.png',
+                ),
+              ],
+            ),
+          ),
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        expect(
+          cubit.state,
+          isA<AppShellSplash>(),
+          reason: 'must wait for the images before showing onboarding',
+        );
+        verify(
+          () => imagePrewarm.prewarm(['https://example.com/slide.png']),
+        ).called(1);
+
+        prewarmCompleter.complete();
+        await Future<void>.delayed(Duration.zero);
+        expect(cubit.state, isA<AppShellOnboarding>());
+
+        await cubit.close();
+      },
+    );
+
+    test(
+      'falls back to the cached state (not Offline) when the timeout elapses '
+      'without a fresh snapshot',
+      () async {
+        when(() => appStateService.hasFreshData).thenReturn(false);
+        when(() => appStateService.current).thenReturn(_state());
+        final cubit = build(splashTimeout: const Duration(milliseconds: 50));
+
+        await Future<void>.delayed(const Duration(milliseconds: 120));
+        expect(cubit.state, isA<AppShellWebView>());
+        await cubit.close();
+      },
+    );
   });
 
   group('side effects', () {
@@ -298,22 +399,22 @@ void main() {
     );
 
     blocTest<AppShellCubit, AppShellState>(
-      'requests push permission the first time WebView is shown',
+      'does NOT request push permission when WebView is shown — the prompt '
+      'belongs to the end of onboarding',
       build: build,
       act: (c) => controller.add(_state()),
-      verify: (_) {
-        verify(() => pushService.requestPermission()).called(1);
-        verify(() => storage.setPushPermissionRequested()).called(1);
-      },
+      verify: (_) => verifyNever(() => pushService.requestPermission()),
     );
 
     blocTest<AppShellCubit, AppShellState>(
-      'does NOT re-request push permission if already asked',
+      'does NOT re-request push permission on onboarding completion if '
+      'already asked',
       build: () {
         when(() => storage.pushPermissionRequested).thenReturn(true);
+        when(() => appStateService.current).thenReturn(_state());
         return build();
       },
-      act: (c) => controller.add(_state()),
+      act: (c) => c.markOnboardingCompleted(1),
       verify: (_) => verifyNever(() => pushService.requestPermission()),
     );
 

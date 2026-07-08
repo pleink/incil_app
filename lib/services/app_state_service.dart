@@ -24,11 +24,17 @@ class AppStateService {
   final BehaviorSubject<AppState?> _subject;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sub;
   bool _hasFirestoreData;
+  bool _hasFreshData = false;
 
   /// True once a Firestore snapshot has been successfully parsed, or true at
   /// construction if a cached AppState was loaded from local storage. False
   /// when the cubit is running purely on the `Flavor.defaultAppState` fallback.
   bool get hasRealData => _hasFirestoreData;
+
+  /// True once a Firestore snapshot has been parsed *this session* — i.e. the
+  /// current value is live, not the cached/fallback seed. The splash holds for
+  /// this so a stale cached state can't flash the wrong surface.
+  bool get hasFreshData => _hasFreshData;
 
   /// Flat remote-control collection: one document per concern
   /// (webview, allowedHosts, emergency, forceUpdate, onboarding,
@@ -64,6 +70,7 @@ class AppStateService {
       final state = AppState.fromConfigDocs(docs);
       await _storage.writeCachedAppState(state);
       _hasFirestoreData = true;
+      _hasFreshData = true;
       _subject.add(state);
     } catch (e, st) {
       developer.log(
