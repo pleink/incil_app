@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../models/app_state.dart';
+import '../../models/onboarding_config.dart';
 import '../../services/app_state_service.dart';
 import '../../services/connectivity_service.dart';
 import '../../services/image_prewarm_service.dart';
@@ -209,7 +210,7 @@ class AppShellCubit extends Cubit<AppShellState> {
     );
   }
 
-  bool _shouldShowOnboarding(onboarding) {
+  bool _shouldShowOnboarding(OnboardingConfig onboarding) {
     if (!onboarding.enabled) return false;
     return _storage.completedOnboardingVersion < onboarding.version;
   }

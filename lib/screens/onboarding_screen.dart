@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -236,8 +237,10 @@ class _SlideState extends State<_Slide> with SingleTickerProviderStateMixin {
       fit: StackFit.expand,
       children: [
         if (slide.imageUrl != null)
-          Image.network(
-            slide.imageUrl!,
+          Image(
+            // Disk-backed: survives restarts and shares the cache key with
+            // ImagePrewarmService, so a prewarmed slide renders instantly.
+            image: CachedNetworkImageProvider(slide.imageUrl!),
             fit: BoxFit.cover,
             // Crop overflow at the bottom, never at the top.
             alignment: Alignment.topCenter,
