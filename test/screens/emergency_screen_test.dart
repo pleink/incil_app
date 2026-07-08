@@ -78,12 +78,14 @@ void main() {
       }
       expect(updated, findsOneWidget);
 
+      // Design order: message cards stacked together, call button pinned to
+      // the bottom above footer + timestamp.
       final positions = [
         topOf(tester, title),
         topOf(tester, subtitle),
         topOf(tester, body1),
-        topOf(tester, button),
         topOf(tester, body2),
+        topOf(tester, button),
         topOf(tester, footer),
         topOf(tester, updated),
       ];

@@ -16,8 +16,8 @@ abstract final class IncilColors {
   static const accentPink = Color(0xFFD82C5F);
   static const accentYellow = Color(0xFFFEBB13);
 
-  static const emergency = Color(0xFFC62828);
-  static const onEmergency = Color(0xFFFFFFFF);
+  static const emergency = Color(0xFFB22424);
+  static const onEmergency = Color(0xFFFAF5F0);
 
   static const muted = Color(0xFF7A716B);
   static const border = Color(0xFFEADFD3);

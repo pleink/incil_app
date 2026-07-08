@@ -32,12 +32,14 @@ GoRouter buildAppRouter(AppShellCubit cubit) {
       GoRoute(path: AppRoutes.splash, builder: (_, __) => const SplashScreen()),
       GoRoute(
         path: AppRoutes.emergency,
-        builder: (_, __) {
-          final s = cubit.state;
-          return s is AppShellEmergency
+        // BlocBuilder instead of reading cubit.state once: the config can
+        // change (new title/body) while the screen is already on display,
+        // and go_router won't rebuild the page for a same-path redirect.
+        builder: (_, __) => BlocBuilder<AppShellCubit, AppShellState>(
+          builder: (_, s) => s is AppShellEmergency
               ? EmergencyScreen(config: s.config)
-              : const SplashScreen();
-        },
+              : const SplashScreen(),
+        ),
       ),
       GoRoute(
         path: AppRoutes.forceUpdate,
