@@ -62,3 +62,8 @@ ios/Flutter/flutter_export_environment.sh
 # FVM Version Cache
 .fvm/
 .fvm/flutter_sdk
+
+# Claude Code local state + mobile-dev plan scratch
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.mobile-dev/
