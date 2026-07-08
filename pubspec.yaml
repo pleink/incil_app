@@ -57,3 +57,8 @@ flutter:
   assets:
     - assets/logo/
     - assets/splash/
+
+  fonts:
+    - family: NeueRegrade
+      fonts:
+        - asset: assets/fonts/NeueRegradeVariable.ttf

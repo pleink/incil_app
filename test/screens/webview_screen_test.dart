@@ -1,9 +1,14 @@
+import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:webview_flutter_platform_interface/webview_flutter_platform_interface.dart';
 
+import 'package:incil_camp_app/cubits/app_shell/app_shell_cubit.dart';
+import 'package:incil_camp_app/cubits/app_shell/app_shell_state.dart';
 import 'package:incil_camp_app/di/service_locator.dart';
+import 'package:incil_camp_app/l10n/app_localizations.dart';
 import 'package:incil_camp_app/screens/webview_screen.dart';
 import 'package:incil_camp_app/services/connectivity_service.dart';
 import 'package:incil_camp_app/services/url_service.dart';
@@ -11,6 +16,9 @@ import 'package:incil_camp_app/services/url_service.dart';
 class _UrlServiceMock extends Mock implements UrlService {}
 
 class _ConnectivityServiceMock extends Mock implements ConnectivityService {}
+
+class _AppShellCubitMock extends MockCubit<AppShellState>
+    implements AppShellCubit {}
 
 /// Fake platform implementation recording created controllers and every
 /// `loadRequest` issued against them.
@@ -92,6 +100,7 @@ class _FakeWebViewWidget extends PlatformWebViewWidget {
 void main() {
   late _FakeWebViewPlatform platform;
   late _ConnectivityServiceMock connectivity;
+  late _AppShellCubitMock shellCubit;
 
   setUp(() {
     platform = _FakeWebViewPlatform();
@@ -103,6 +112,13 @@ void main() {
       () => connectivity.onlineStream,
     ).thenAnswer((_) => const Stream<bool>.empty());
 
+    shellCubit = _AppShellCubitMock();
+    whenListen(
+      shellCubit,
+      const Stream<AppShellState>.empty(),
+      initialState: const AppShellSplash(),
+    );
+
     getIt
       ..registerSingleton<UrlService>(_UrlServiceMock())
       ..registerSingleton<ConnectivityService>(connectivity);
@@ -113,7 +129,13 @@ void main() {
   });
 
   Widget wrap(String url) => MaterialApp(
-    home: WebViewScreen(url: url, allowedHosts: const ['incil.huulo.io']),
+    locale: const Locale('de'),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    home: BlocProvider<AppShellCubit>.value(
+      value: shellCubit,
+      child: WebViewScreen(url: url, allowedHosts: const ['incil.huulo.io']),
+    ),
   );
 
   group('WebViewScreen URL updates', () {
@@ -147,5 +169,54 @@ void main() {
       expect(platform.controllers, hasLength(1));
       expect(platform.controllers.single.loadedUris, hasLength(1));
     });
+
+    testWidgets(
+      'AppShellWebView emission with a new URL loads it even without a '
+      'widget rebuild (push deep link while WebView is active)',
+      (tester) async {
+        // go_router does not rebuild the route when the location stays
+        // /webview, so the deep link must arrive via the cubit stream.
+        const deepLink = AppShellWebView(
+          url: 'https://incil.huulo.io/post/das-war-incil-24',
+          allowedHosts: ['incil.huulo.io'],
+          oneSignalTags: {},
+        );
+        whenListen(
+          shellCubit,
+          Stream<AppShellState>.fromIterable(const [deepLink]),
+          initialState: const AppShellSplash(),
+        );
+
+        await tester.pumpWidget(wrap('https://incil.huulo.io/app'));
+        await tester.pump();
+
+        expect(platform.controllers, hasLength(1));
+        expect(platform.controllers.single.loadedUris, [
+          Uri.parse('https://incil.huulo.io/app'),
+          Uri.parse('https://incil.huulo.io/post/das-war-incil-24'),
+        ]);
+      },
+    );
+
+    testWidgets(
+      'AppShellWebView emission with the current URL does not reload',
+      (tester) async {
+        const same = AppShellWebView(
+          url: 'https://incil.huulo.io/app',
+          allowedHosts: ['incil.huulo.io'],
+          oneSignalTags: {},
+        );
+        whenListen(
+          shellCubit,
+          Stream<AppShellState>.fromIterable(const [same]),
+          initialState: const AppShellSplash(),
+        );
+
+        await tester.pumpWidget(wrap('https://incil.huulo.io/app'));
+        await tester.pump();
+
+        expect(platform.controllers.single.loadedUris, hasLength(1));
+      },
+    );
   });
 }

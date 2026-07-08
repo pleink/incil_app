@@ -6,12 +6,14 @@ class PrimaryButton extends StatelessWidget {
     required this.label,
     required this.onPressed,
     this.icon,
+    this.trailingIcon,
     this.tone = PrimaryButtonTone.normal,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final IconData? icon;
+  final IconData? trailingIcon;
   final PrimaryButtonTone tone;
 
   @override
@@ -25,12 +27,13 @@ class PrimaryButton extends StatelessWidget {
       ),
     };
 
-    if (icon != null) {
+    if (icon != null || trailingIcon != null) {
       return FilledButton.icon(
         onPressed: onPressed,
-        icon: Icon(icon),
+        icon: Icon(icon ?? trailingIcon),
         label: Text(label),
         style: style,
+        iconAlignment: icon != null ? IconAlignment.start : IconAlignment.end,
       );
     }
     return FilledButton(onPressed: onPressed, style: style, child: Text(label));

@@ -2,9 +2,11 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Remote-control config read by the unauthenticated app client.
-    // Writes happen only via trusted admin tooling, never from the app.
-    match /apps/incil/config/{document} {
+    // Remote-control config read by the unauthenticated app client: one
+    // document per concern (allowedHosts, emergency, forceUpdate, onboarding,
+    // oneSignalTags, webview). Writes happen only via trusted admin tooling,
+    // never from the app.
+    match /config/{document} {
       allow read: if true;
       allow write: if false;
     }

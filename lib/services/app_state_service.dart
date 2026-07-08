@@ -22,15 +22,24 @@ class AppStateService {
   final FirebaseFirestore _firestore;
   final LocalStorageService _storage;
   final BehaviorSubject<AppState?> _subject;
-  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _sub;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sub;
   bool _hasFirestoreData;
+  bool _hasFreshData = false;
 
   /// True once a Firestore snapshot has been successfully parsed, or true at
   /// construction if a cached AppState was loaded from local storage. False
   /// when the cubit is running purely on the `Flavor.defaultAppState` fallback.
   bool get hasRealData => _hasFirestoreData;
 
-  static const _docPath = 'apps/incil/config/app_state';
+  /// True once a Firestore snapshot has been parsed *this session* — i.e. the
+  /// current value is live, not the cached/fallback seed. The splash holds for
+  /// this so a stale cached state can't flash the wrong surface.
+  bool get hasFreshData => _hasFreshData;
+
+  /// Flat remote-control collection: one document per concern
+  /// (webview, allowedHosts, emergency, forceUpdate, onboarding,
+  /// oneSignalTags).
+  static const _collectionPath = 'config';
 
   Stream<AppState?> get stream => _subject.stream;
   AppState? get current => _subject.valueOrNull;
@@ -38,7 +47,7 @@ class AppStateService {
   void start() {
     if (_sub != null) return;
     _sub = _firestore
-        .doc(_docPath)
+        .collection(_collectionPath)
         .snapshots()
         .listen(
           _onSnapshot,
@@ -54,14 +63,14 @@ class AppStateService {
         );
   }
 
-  Future<void> _onSnapshot(DocumentSnapshot<Map<String, dynamic>> snap) async {
-    if (!snap.exists) return;
-    final data = snap.data();
-    if (data == null) return;
+  Future<void> _onSnapshot(QuerySnapshot<Map<String, dynamic>> snap) async {
+    if (snap.docs.isEmpty) return;
+    final docs = {for (final doc in snap.docs) doc.id: doc.data()};
     try {
-      final state = AppState.fromJson(data);
+      final state = AppState.fromConfigDocs(docs);
       await _storage.writeCachedAppState(state);
       _hasFirestoreData = true;
+      _hasFreshData = true;
       _subject.add(state);
     } catch (e, st) {
       developer.log(

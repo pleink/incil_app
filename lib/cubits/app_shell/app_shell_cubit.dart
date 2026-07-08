@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../models/app_state.dart';
 import '../../services/app_state_service.dart';
 import '../../services/connectivity_service.dart';
+import '../../services/image_prewarm_service.dart';
 import '../../services/local_storage_service.dart';
 import '../../services/push_service.dart';
 import '../../services/version_service.dart';
@@ -18,6 +19,7 @@ class AppShellCubit extends Cubit<AppShellState> {
     required LocalStorageService storage,
     required PushService pushService,
     required ConnectivityService connectivity,
+    required ImagePrewarmService imagePrewarm,
     Duration minSplashDuration = const Duration(seconds: 2),
     Duration splashTimeout = const Duration(seconds: 8),
   }) : _appStateService = appStateService,
@@ -25,6 +27,7 @@ class AppShellCubit extends Cubit<AppShellState> {
        _storage = storage,
        _pushService = pushService,
        _connectivity = connectivity,
+       _imagePrewarm = imagePrewarm,
        super(const AppShellSplash()) {
     _subscription = _appStateService.stream.listen(_onAppState);
     _connSubscription = _connectivity.onlineStream.listen(
@@ -41,10 +44,12 @@ class AppShellCubit extends Cubit<AppShellState> {
       _minSplashElapsed = true;
     }
 
+    // The timeout always runs: with no data at all it lands on Offline, with
+    // only cached/fallback data it resolves that as a last resort (see
+    // _onSplashTimeout).
+    _splashTimer = Timer(splashTimeout, _onSplashTimeout);
     if (_appStateService.current != null) {
       _onAppState(_appStateService.current);
-    } else {
-      _splashTimer = Timer(splashTimeout, _onSplashTimeout);
     }
   }
 
@@ -53,6 +58,7 @@ class AppShellCubit extends Cubit<AppShellState> {
   final LocalStorageService _storage;
   final PushService _pushService;
   final ConnectivityService _connectivity;
+  final ImagePrewarmService _imagePrewarm;
 
   StreamSubscription<AppState?>? _subscription;
   StreamSubscription<bool>? _connSubscription;
@@ -72,11 +78,20 @@ class AppShellCubit extends Cubit<AppShellState> {
   String? _lastConfigWebviewUrl;
 
   void _onSplashTimeout() {
-    if (state is AppShellSplash) emit(const AppShellOffline());
+    if (state is! AppShellSplash) return;
+    // No fresh snapshot arrived in time — fall back to whatever we have
+    // (cached or fallback state); only a fully empty service means Offline.
+    final current = _appStateService.current;
+    if (current != null) {
+      _resolveAndEmit(current);
+    } else {
+      emit(const AppShellOffline());
+    }
   }
 
   void _onMinSplashElapsed() {
     _minSplashElapsed = true;
+    if (!_appStateService.hasFreshData) return; // keep holding on Splash
     final current = _appStateService.current;
     if (current != null) _resolveAndEmit(current);
   }
@@ -85,15 +100,42 @@ class AppShellCubit extends Cubit<AppShellState> {
     if (appState == null) return;
     _maybeApplyTags(appState.oneSignalTags);
     if (!_minSplashElapsed) return;
+    // While still on the splash, don't resolve from the cached/fallback seed —
+    // a stale cache could flash the wrong surface (e.g. WebView for a beat,
+    // then Onboarding once the live snapshot lands). Hold for the first fresh
+    // snapshot; _onSplashTimeout is the escape hatch when Firestore is
+    // unreachable.
+    if (state is AppShellSplash && !_appStateService.hasFreshData) return;
     _resolveAndEmit(appState);
   }
 
   void _resolveAndEmit(AppState appState) {
     _splashTimer?.cancel();
     _splashTimer = null;
-    final next = _resolve(appState);
-    emit(next);
-    if (next is AppShellWebView) _maybeRequestPushPermission();
+    final resolved = _resolve(appState);
+    // Leaving the splash for onboarding: hold until the slide images are in
+    // the image cache (bounded by the prewarm timeout) so the slides never
+    // pop in after the screen is already visible.
+    if (state is AppShellSplash && resolved is AppShellOnboarding) {
+      final urls = [
+        for (final slide in resolved.config.slides)
+          if (slide.imageUrl != null) slide.imageUrl!,
+      ];
+      if (urls.isNotEmpty) {
+        unawaited(_emitAfterPrewarm(resolved, urls));
+        return;
+      }
+    }
+    emit(resolved);
+  }
+
+  Future<void> _emitAfterPrewarm(
+    AppShellOnboarding resolved,
+    List<String> urls,
+  ) async {
+    await _imagePrewarm.prewarm(urls);
+    // Only emit if nothing else resolved the shell in the meantime.
+    if (!isClosed && state is AppShellSplash) emit(resolved);
   }
 
   void _onConnectivityChanged(bool online) {
@@ -220,9 +262,11 @@ class AppShellCubit extends Cubit<AppShellState> {
     _splashTimer = Timer(const Duration(seconds: 8), _onSplashTimeout);
     await _appStateService.retry();
     // Re-resolve immediately against the (possibly cached) current state so
-    // we don't hang on Splash when there's already data to work with.
+    // we don't hang on Splash when there's already data to work with. This
+    // deliberately skips the hold-for-fresh gate: the user explicitly retried,
+    // and _resolve's offline guard catches the still-offline case.
     final current = _appStateService.current;
-    if (current != null) _onAppState(current);
+    if (current != null) _resolveAndEmit(current);
   }
 
   @override

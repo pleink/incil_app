@@ -7,6 +7,9 @@
   "loadingMessage": "Wird geladen…",
   "@loadingMessage": {},
 
+  "webviewLoadingMessage": "App-Inhalte werden geladen…",
+  "@webviewLoadingMessage": {},
+
   "retry": "Erneut versuchen",
   "@retry": {},
 

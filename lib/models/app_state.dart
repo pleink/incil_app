@@ -54,6 +54,22 @@ class AppState extends Equatable {
     );
   }
 
+  /// Builds an [AppState] from the flat Firestore `config` collection, where
+  /// each concern lives in its own document keyed by id (`webview`,
+  /// `allowedHosts`, `emergency`, `forceUpdate`, `onboarding`,
+  /// `oneSignalTags`). Missing documents fall back to the same defaults as
+  /// [fromJson].
+  factory AppState.fromConfigDocs(Map<String, Map<String, dynamic>> docs) {
+    return AppState.fromJson({
+      'webviewUrl': docs['webview']?['url'],
+      'allowedHosts': docs['allowedHosts']?['urls'],
+      'emergency': docs['emergency'],
+      'forceUpdate': docs['forceUpdate'],
+      'onboarding': docs['onboarding'],
+      'oneSignalTags': docs['oneSignalTags'],
+    });
+  }
+
   Map<String, dynamic> toJson() => {
     'webviewUrl': webviewUrl,
     'allowedHosts': allowedHosts,

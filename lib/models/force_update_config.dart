@@ -24,8 +24,12 @@ class ForceUpdateConfig extends Equatable {
   factory ForceUpdateConfig.fromJson(Map<String, dynamic> json) {
     return ForceUpdateConfig(
       enabled: json['enabled'] as bool? ?? false,
-      minIosBuildNumber: (json['minIosBuildNumber'] as num?)?.toInt(),
-      minAndroidVersionCode: (json['minAndroidVersionCode'] as num?)?.toInt(),
+      // Firestore uses the short `ios` / `android` keys; the offline cache
+      // (toJson) keeps the long names.
+      minIosBuildNumber: ((json['minIosBuildNumber'] ?? json['ios']) as num?)
+          ?.toInt(),
+      minAndroidVersionCode:
+          ((json['minAndroidVersionCode'] ?? json['android']) as num?)?.toInt(),
       title: json['title'] as String?,
       message: json['message'] as String?,
       iosStoreUrl: json['iosStoreUrl'] as String?,

@@ -47,19 +47,21 @@ test/                                 # util/, cubits/, models round-trip
 ## Data flow
 
 ```
-Firestore doc                                      SharedPreferences cache
- apps/incil/config/app_state                        cachedAppStateJson
+Firestore collection                               SharedPreferences cache
+ config/{webview,allowedHosts,emergency,            cachedAppStateJson
+        forceUpdate,onboarding,oneSignalTags}
         │                                                  ▲
         ▼                                                  │
  AppStateService                                           │
-   - snapshot → AppState.fromJson → write cache → emit     │
+   - snapshot → AppState.fromConfigDocs → write cache → emit│
    - BehaviorSubject seeded from (cache ?? flavor.defaultAppState)
         │
         ▼  Stream<AppState?>
  AppShellCubit
    - resolves screen-priority: emergency > forceUpdate > onboarding > webview
    - applies oneSignalTags (de-duplicated)
-   - 8s splash timeout → AppShellOffline if no data
+   - splash holds for the first FRESH snapshot (cached seed alone won't resolve it)
+   - 8s splash timeout → fall back to cached state, or AppShellOffline if no data
         │
         ▼  AppShellState
  GoRouter.redirect (refreshListenable wraps the cubit's stream)
@@ -138,7 +140,9 @@ Two paths into `AppShellOffline`:
 
 1. **Cold start, no data:** `AppStateService` has no cache and Firestore never
    responds. After `splashTimeout` (8 s by default), `AppShellCubit` emits
-   `AppShellOffline`.
+   `AppShellOffline`. (With a cache but no fresh snapshot, the same timeout
+   resolves the cached state instead — the splash otherwise holds for the first
+   fresh snapshot so a stale cache can't flash the wrong surface.)
 2. **WebView load failure:** `WebViewCubit.onLoadFailed` fires on main-frame
    errors → `BlocListener` calls `AppShellCubit.reportWebViewFailure`.
 
