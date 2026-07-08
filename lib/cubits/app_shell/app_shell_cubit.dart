@@ -227,6 +227,8 @@ class AppShellCubit extends Cubit<AppShellState> {
 
   Future<void> markOnboardingCompleted(int version) async {
     await _storage.setCompletedOnboardingVersion(version);
+    // The slide images no longer need to be pinned in the image cache.
+    _imagePrewarm.release();
     _maybeRequestPushPermission();
     final current = _appStateService.current;
     if (current != null) emit(_resolve(current));

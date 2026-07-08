@@ -10,6 +10,7 @@ import 'package:incil_camp_app/services/image_prewarm_service.dart';
 /// (or errors) exactly when the test completes [completer].
 class _TestImageProvider extends ImageProvider<_TestImageProvider> {
   final completer = Completer<ImageInfo>();
+  var loadCalls = 0;
 
   @override
   Future<_TestImageProvider> obtainKey(ImageConfiguration configuration) =>
@@ -19,7 +20,10 @@ class _TestImageProvider extends ImageProvider<_TestImageProvider> {
   ImageStreamCompleter loadImage(
     _TestImageProvider key,
     ImageDecoderCallback decode,
-  ) => OneFrameImageStreamCompleter(completer.future);
+  ) {
+    loadCalls++;
+    return OneFrameImageStreamCompleter(completer.future);
+  }
 }
 
 void main() {
@@ -109,6 +113,46 @@ void main() {
         expect(secondDone, isTrue);
       },
     );
+
+    test('keeps loaded images live so LRU eviction cannot drop them', () async {
+      final first = service.prewarm(['a']);
+      final provider = providers['a']!;
+      provider.completer.complete(await testImageInfo());
+      await first;
+
+      // Simulate the LRU cache evicting everything (e.g. because later,
+      // larger decodes blew the byte budget).
+      PaintingBinding.instance.imageCache.clear();
+
+      ImageInfo? info;
+      final stream = provider.resolve(ImageConfiguration.empty);
+      final listener = ImageStreamListener((i, _) => info = i);
+      stream.addListener(listener);
+      expect(
+        provider.loadCalls,
+        1,
+        reason: 'the live image must resolve without a re-load',
+      );
+      expect(info, isNotNull, reason: 'must be delivered synchronously');
+      stream.removeListener(listener);
+    });
+
+    test('release() makes the images evictable again', () async {
+      final first = service.prewarm(['a']);
+      final provider = providers['a']!;
+      provider.completer.complete(await testImageInfo());
+      await first;
+
+      service.release();
+      PaintingBinding.instance.imageCache.clear();
+
+      provider.resolve(ImageConfiguration.empty);
+      expect(
+        provider.loadCalls,
+        2,
+        reason: 'without the held listener the image is truly gone',
+      );
+    });
 
     test('an already-loaded URL is not requested again', () async {
       final first = service.prewarm(['a']);
