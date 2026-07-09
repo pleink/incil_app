@@ -116,7 +116,9 @@ class _WebViewViewState extends State<_WebViewView> {
     final controller = WebViewController();
     controller
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.transparent)
+      // The huulo page paints no body background of its own; anything but
+      // white here bleeds through and clashes with its white UI elements.
+      ..setBackgroundColor(Colors.white)
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (u) {
@@ -306,31 +308,37 @@ class _WebViewViewState extends State<_WebViewView> {
           }
         },
         child: Scaffold(
-          body: SafeArea(
-            child: Stack(
-              children: [
+          // Match the WebView's white so the status-bar strip outside the
+          // SafeArea doesn't stand out against the page.
+          backgroundColor: Colors.white,
+          body: Stack(
+            children: [
+              SafeArea(
                 // Keyed by controller identity: when the watchdog rebuilds
                 // the controller, the platform view must be rebuilt too.
-                WebViewWidget(
+                child: WebViewWidget(
                   key: ObjectKey(_controller),
                   controller: _controller,
                 ),
-                BlocBuilder<WebViewCubit, WebViewState>(
-                  builder: (context, state) => state is WebViewLoading
-                      ? ColoredBox(
-                          color: Theme.of(context).colorScheme.surface,
-                          child: Center(
-                            child: LoadingView(
-                              message: AppLocalizations.of(
-                                context,
-                              ).webviewLoadingMessage,
-                            ),
+              ),
+              // Outside the SafeArea on purpose: while loading, the branded
+              // surface color has to cover the status-bar strip too, which
+              // is white otherwise to match the page.
+              BlocBuilder<WebViewCubit, WebViewState>(
+                builder: (context, state) => state is WebViewLoading
+                    ? ColoredBox(
+                        color: Theme.of(context).colorScheme.surface,
+                        child: Center(
+                          child: LoadingView(
+                            message: AppLocalizations.of(
+                              context,
+                            ).webviewLoadingMessage,
                           ),
-                        )
-                      : const SizedBox.shrink(),
-                ),
-              ],
-            ),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ],
           ),
         ),
       ),
