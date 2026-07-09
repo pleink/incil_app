@@ -229,3 +229,33 @@ Firestore security rules live in `firestore.rules` at the repo root
 ```bash
 firebase deploy --only firestore:rules --project <project-id>
 ```
+
+---
+
+## 5. Crashlytics dSYM upload (iOS)
+
+Android mapping upload is automatic (Crashlytics Gradle plugin, wired in
+`settings.gradle.kts` + `app/build.gradle.kts`). iOS needs a manual run-script
+build phase once, or release crashes stay unsymbolicated:
+
+1. Xcode → Runner target → **Build Phases** → `+` → *New Run Script Phase*
+   (place it **after** "Embed Frameworks").
+2. Script:
+
+   ```bash
+   "${PODS_ROOT}/FirebaseCrashlytics/run"
+   ```
+
+3. **Input Files**:
+
+   ```
+   ${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Resources/DWARF/${TARGET_NAME}
+   $(SRCROOT)/$(BUILT_PRODUCTS_DIR)/$(INFOPLIST_PATH)
+   ```
+
+4. Applies to both Dev and Prod build configurations (single Runner target, so
+   one phase covers both schemes).
+
+The phase reads `GoogleService-Info.plist`, so the per-flavor copy phase from
+§1 must run before it. Verify after the first release build: Crashlytics
+console → the test crash shows file/line info.

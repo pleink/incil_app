@@ -7,6 +7,7 @@ import 'cubits/app_shell/app_shell_cubit.dart';
 import 'di/service_locator.dart';
 import 'l10n/app_localizations.dart';
 import 'navigation/app_router.dart';
+import 'services/analytics_service.dart';
 import 'services/app_state_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/image_prewarm_service.dart';
@@ -36,7 +37,10 @@ class _IncilAppState extends State<IncilApp> {
     waitUntilForeground: waitUntilAppResumed,
   );
 
-  late final _router = buildAppRouter(_cubit);
+  late final _router = buildAppRouter(
+    _cubit,
+    analytics: getIt<AnalyticsService>(),
+  );
 
   @override
   void initState() {

@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../cubits/app_shell/app_shell_cubit.dart';
 import '../cubits/app_shell/app_shell_state.dart';
 import '../screens/emergency_screen.dart';
+import '../services/analytics_service.dart';
 import '../screens/force_update_screen.dart';
 import '../screens/offline_screen.dart';
 import '../screens/onboarding_screen.dart';
@@ -22,12 +23,19 @@ abstract final class AppRoutes {
   static const offline = '/offline';
 }
 
-GoRouter buildAppRouter(AppShellCubit cubit) {
+GoRouter buildAppRouter(AppShellCubit cubit, {AnalyticsService? analytics}) {
   return GoRouter(
     initialLocation: AppRoutes.splash,
     debugLogDiagnostics: kDebugMode,
     refreshListenable: _CubitListenable(cubit.stream),
-    redirect: (context, state) => _redirectFor(cubit.state),
+    redirect: (context, state) {
+      final target = _redirectFor(cubit.state);
+      // Screen tracking lives here because navigation is redirect-driven:
+      // every screen change passes through this resolver. The service
+      // dedupes the repeat calls for an unchanged screen.
+      analytics?.logScreen(target ?? state.matchedLocation);
+      return target;
+    },
     routes: [
       GoRoute(path: AppRoutes.splash, builder: (_, __) => const SplashScreen()),
       GoRoute(

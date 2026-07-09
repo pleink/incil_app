@@ -1,8 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/flavor.dart';
+import '../services/analytics_service.dart';
 import '../services/app_state_service.dart';
 import '../services/connectivity_service.dart';
 import '../services/image_prewarm_service.dart';
@@ -29,6 +32,13 @@ Future<void> configureDependencies(Flavor flavor) async {
     ..registerLazySingleton<ImagePrewarmService>(ImagePrewarmService.new)
     ..registerLazySingleton<PushService>(PushService.new)
     ..registerLazySingleton<FirebaseFirestore>(() => FirebaseFirestore.instance)
+    ..registerLazySingleton<AnalyticsService>(() {
+      final analytics = FirebaseAnalytics.instance;
+      // Same rule as Crashlytics in bootstrap(): debug runs stay out of the
+      // production dashboards.
+      analytics.setAnalyticsCollectionEnabled(!kDebugMode);
+      return AnalyticsService(analytics);
+    })
     ..registerLazySingleton<AppStateService>(
       () => AppStateService(
         firestore: getIt<FirebaseFirestore>(),
