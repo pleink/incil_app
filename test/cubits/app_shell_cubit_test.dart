@@ -453,6 +453,42 @@ void main() {
       },
     );
 
+    test('markOnboardingCompleted holds Onboarding until the permission '
+        'request completes — a WKWebView created while the iOS alert has the '
+        'app inactive never paints (white screen until restart)', () async {
+      final permissionAnswered = Completer<void>();
+      when(
+        () => pushService.requestPermission(),
+      ).thenAnswer((_) => permissionAnswered.future);
+      when(() => appStateService.current).thenReturn(
+        _state(
+          onboarding: const OnboardingConfig(
+            enabled: true,
+            version: 3,
+            slides: [OnboardingSlide(title: 't', body: 'b')],
+          ),
+        ),
+      );
+      final cubit = build();
+      expect(cubit.state, isA<AppShellOnboarding>());
+
+      final completion = cubit.markOnboardingCompleted(3);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      // Alert still open: the shell must not resolve to WebView yet, and the
+      // version must stay unpersisted so snapshots keep resolving Onboarding.
+      expect(cubit.state, isA<AppShellOnboarding>());
+      verifyNever(() => storage.setCompletedOnboardingVersion(any()));
+
+      when(() => storage.completedOnboardingVersion).thenReturn(3);
+      permissionAnswered.complete();
+      await completion;
+
+      expect(cubit.state, isA<AppShellWebView>());
+      verify(() => storage.setCompletedOnboardingVersion(3)).called(1);
+      await cubit.close();
+    });
+
     blocTest<AppShellCubit, AppShellState>(
       'reportWebViewFailure transitions to Offline',
       build: () {

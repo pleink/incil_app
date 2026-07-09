@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'config/flavor.dart';
@@ -13,6 +14,7 @@ import 'services/local_storage_service.dart';
 import 'services/push_service.dart';
 import 'services/version_service.dart';
 import 'style/incil_theme.dart';
+import 'util/app_lifecycle.dart';
 
 class IncilApp extends StatefulWidget {
   const IncilApp({super.key, required this.flavor});
@@ -31,6 +33,7 @@ class _IncilAppState extends State<IncilApp> {
     pushService: getIt<PushService>(),
     connectivity: getIt<ConnectivityService>(),
     imagePrewarm: getIt<ImagePrewarmService>(),
+    waitUntilForeground: waitUntilAppResumed,
   );
 
   late final _router = buildAppRouter(_cubit);
@@ -51,6 +54,17 @@ class _IncilAppState extends State<IncilApp> {
 
   @override
   Widget build(BuildContext context) {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarIconBrightness: Brightness.dark,
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+      ),
+    );
+
     return BlocProvider<AppShellCubit>.value(
       value: _cubit,
       child: MaterialApp.router(

@@ -21,6 +21,7 @@ class AppShellCubit extends Cubit<AppShellState> {
     required PushService pushService,
     required ConnectivityService connectivity,
     required ImagePrewarmService imagePrewarm,
+    Future<void> Function()? waitUntilForeground,
     Duration minSplashDuration = const Duration(seconds: 2),
     Duration splashTimeout = const Duration(seconds: 8),
   }) : _appStateService = appStateService,
@@ -29,6 +30,7 @@ class AppShellCubit extends Cubit<AppShellState> {
        _pushService = pushService,
        _connectivity = connectivity,
        _imagePrewarm = imagePrewarm,
+       _waitUntilForeground = waitUntilForeground,
        super(const AppShellSplash()) {
     _subscription = _appStateService.stream.listen(_onAppState);
     _connSubscription = _connectivity.onlineStream.listen(
@@ -60,6 +62,10 @@ class AppShellCubit extends Cubit<AppShellState> {
   final PushService _pushService;
   final ConnectivityService _connectivity;
   final ImagePrewarmService _imagePrewarm;
+
+  /// Completes once the app is foregrounded (`waitUntilAppResumed` in
+  /// production; null in tests, where there is no widget binding).
+  final Future<void> Function()? _waitUntilForeground;
 
   StreamSubscription<AppState?>? _subscription;
   StreamSubscription<bool>? _connSubscription;
@@ -149,10 +155,10 @@ class AppShellCubit extends Cubit<AppShellState> {
     }
   }
 
-  void _maybeRequestPushPermission() {
+  Future<void> _maybeRequestPushPermission() async {
     if (_storage.pushPermissionRequested) return;
-    unawaited(_pushService.requestPermission());
     unawaited(_storage.setPushPermissionRequested());
+    await _pushService.requestPermission();
   }
 
   AppShellState _resolve(AppState appState) {
@@ -226,10 +232,21 @@ class AppShellCubit extends Cubit<AppShellState> {
   }
 
   Future<void> markOnboardingCompleted(int version) async {
-    await _storage.setCompletedOnboardingVersion(version);
     // The slide images no longer need to be pinned in the image cache.
     _imagePrewarm.release();
-    _maybeRequestPushPermission();
+    // iOS: the permission alert puts the app in the inactive state; a
+    // WKWebView platform view created during that window never paints (white
+    // screen until the app is restarted). Hold the shell on Onboarding until
+    // the user has answered the alert, and only then resolve to the WebView.
+    // The version is persisted afterwards for the same reason: incoming
+    // Firestore snapshots keep resolving to Onboarding while we wait.
+    await _maybeRequestPushPermission();
+    // The permission future resolves on the tap itself, while the dismissing
+    // alert still holds the app inactive — a WebView created in that window
+    // hangs mid-load. Wait until the app is fully resumed.
+    await _waitUntilForeground?.call();
+    await _storage.setCompletedOnboardingVersion(version);
+    if (isClosed) return;
     final current = _appStateService.current;
     if (current != null) emit(_resolve(current));
   }
