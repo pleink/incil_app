@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'config/flavor.dart';
 import 'cubits/app_shell/app_shell_cubit.dart';
+import 'cubits/app_shell/app_shell_state.dart';
 import 'di/service_locator.dart';
 import 'l10n/app_localizations.dart';
 import 'navigation/app_router.dart';
@@ -59,25 +60,21 @@ class _IncilAppState extends State<IncilApp> {
   @override
   Widget build(BuildContext context) {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(
-        systemNavigationBarColor: Colors.transparent,
-        systemNavigationBarIconBrightness: Brightness.dark,
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
-      ),
-    );
 
     return BlocProvider<AppShellCubit>.value(
       value: _cubit,
-      child: MaterialApp.router(
-        title: widget.flavor.displayName,
-        debugShowCheckedModeBanner: widget.flavor == Flavor.dev,
-        theme: IncilTheme.light(),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        routerConfig: _router,
+      child: BlocBuilder<AppShellCubit, AppShellState>(
+        builder: (context, state) => AnnotatedRegion<SystemUiOverlayStyle>(
+          value: overlayStyleFor(state),
+          child: MaterialApp.router(
+            title: widget.flavor.displayName,
+            debugShowCheckedModeBanner: widget.flavor == Flavor.dev,
+            theme: IncilTheme.light(),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            routerConfig: _router,
+          ),
+        ),
       ),
     );
   }
