@@ -8,7 +8,7 @@ import 'package:incil_camp_app/navigation/app_router.dart';
 import 'package:incil_camp_app/style/incil_system_ui.dart';
 
 void main() {
-  group('overlayStyleFor keeps status-bar icons legible per screen (#22)', () {
+  group('overlayStyleFor keeps status-bar icons legible per screen', () {
     const lightIconStates = <AppShellState>[
       AppShellSplash(),
       AppShellEmergency(EmergencyConfig.empty),

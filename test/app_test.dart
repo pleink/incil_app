@@ -16,7 +16,7 @@ class _AppShellCubitMock extends MockCubit<AppShellState>
 
 void main() {
   // Mirrors IncilApp: an annotation above MaterialApp must drive the status
-  // bar and follow the shell state (#22).
+  // bar and follow the shell state.
   testWidgets('status-bar style is applied above the router and tracks state', (
     tester,
   ) async {

@@ -100,7 +100,7 @@ String? _redirectFor(AppShellState state) {
 }
 
 /// Status-bar contrast for the active screen: dark backgrounds get light
-/// icons, light backgrounds dark. Applied above the router, not per screen (#22).
+/// icons, light backgrounds dark. Applied above the router, not per screen.
 SystemUiOverlayStyle overlayStyleFor(AppShellState state) {
   return switch (state) {
     AppShellSplash() => IncilSystemUi.lightIcons,
