@@ -154,7 +154,11 @@ void main() {
     supportedLocales: AppLocalizations.supportedLocales,
     home: BlocProvider<AppShellCubit>.value(
       value: shellCubit,
-      child: WebViewScreen(url: url, allowedHosts: const ['incil.huulo.io']),
+      child: WebViewScreen(
+        url: url,
+        allowedHosts: const ['incil.huulo.io'],
+        inAppBrowserHosts: const ['shop.incil.ch'],
+      ),
     ),
   );
 
@@ -199,6 +203,7 @@ void main() {
         const deepLink = AppShellWebView(
           url: 'https://incil.huulo.io/post/das-war-incil-24',
           allowedHosts: ['incil.huulo.io'],
+          inAppBrowserHosts: ['shop.incil.ch'],
           oneSignalTags: {},
         );
         whenListen(
@@ -224,6 +229,7 @@ void main() {
         const same = AppShellWebView(
           url: 'https://incil.huulo.io/app',
           allowedHosts: ['incil.huulo.io'],
+          inAppBrowserHosts: ['shop.incil.ch'],
           oneSignalTags: {},
         );
         whenListen(

@@ -19,6 +19,7 @@ void main() {
   const state = AppState(
     webviewUrl: 'https://incil.huulo.io/app',
     allowedHosts: ['incil.huulo.io'],
+    inAppBrowserHosts: ['shop.incil.ch'],
     emergency: EmergencyConfig.empty,
     forceUpdate: forceUpdate,
     onboarding: OnboardingConfig.empty,
@@ -41,6 +42,7 @@ void main() {
       expect(copy.forceUpdate, ForceUpdateConfig.empty);
       expect(copy.webviewUrl, state.webviewUrl);
       expect(copy.allowedHosts, state.allowedHosts);
+      expect(copy.inAppBrowserHosts, state.inAppBrowserHosts);
       expect(copy.emergency, state.emergency);
       expect(copy.onboarding, state.onboarding);
       expect(copy.oneSignalTags, state.oneSignalTags);
@@ -55,6 +57,9 @@ void main() {
         'webview': {'url': 'https://incil.huulo.io/app'},
         'allowedHosts': {
           'urls': ['incil.huulo.io'],
+        },
+        'inAppBrowserHosts': {
+          'urls': ['shop.incil.ch'],
         },
         'emergency': const {},
         'forceUpdate': forceUpdate.toJson(),
@@ -77,6 +82,7 @@ void main() {
       final restored = AppState.fromConfigDocs(const {});
       expect(restored.webviewUrl, '');
       expect(restored.allowedHosts, isEmpty);
+      expect(restored.inAppBrowserHosts, isEmpty);
       expect(restored.emergency, EmergencyConfig.empty);
       expect(restored.forceUpdate, ForceUpdateConfig.empty);
       expect(restored.onboarding, OnboardingConfig.empty);

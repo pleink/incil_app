@@ -40,6 +40,7 @@ enum Flavor {
   AppState get defaultAppState => AppState(
     webviewUrl: defaultWebviewUrl,
     allowedHosts: const ['incil-24-4366.huulo.app', 'huulo.app', 'huulo.io'],
+    inAppBrowserHosts: const ['shop.incil.ch'],
     emergency: EmergencyConfig.empty,
     forceUpdate: ForceUpdateConfig.empty,
     onboarding: OnboardingConfig.empty,

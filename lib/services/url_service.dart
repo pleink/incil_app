@@ -3,7 +3,8 @@ import 'dart:developer' as developer;
 import 'package:url_launcher/url_launcher.dart';
 
 class UrlService {
-  Future<bool> openExternal(Uri uri) => _launch(uri, LaunchMode.externalApplication);
+  Future<bool> openExternal(Uri uri) =>
+      _launch(uri, LaunchMode.externalApplication);
 
   /// Opens [uri] in a native in-app browser sheet — SFSafariViewController
   /// on iOS, Chrome Custom Tabs on Android — instead of leaving the app.

@@ -72,7 +72,11 @@ GoRouter buildAppRouter(AppShellCubit cubit, {AnalyticsService? analytics}) {
         builder: (_, __) {
           final s = cubit.state;
           return s is AppShellWebView
-              ? WebViewScreen(url: s.url, allowedHosts: s.allowedHosts)
+              ? WebViewScreen(
+                  url: s.url,
+                  allowedHosts: s.allowedHosts,
+                  inAppBrowserHosts: s.inAppBrowserHosts,
+                )
               : const SplashScreen();
         },
       ),

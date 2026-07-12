@@ -209,6 +209,9 @@ Minimal seed documents:
 // config/allowedHosts
 { "urls": ["incil-24-4366.huulo.app", "huulo.app", "huulo.io"] }
 
+// config/inAppBrowserHosts
+{ "urls": ["shop.incil.ch"] }
+
 // config/emergency
 { "enabled": false, "title": "", "subtitle": "", "body1": "", "contact": "", "body2": "", "footer": "" }
 
