@@ -26,6 +26,10 @@ const _iosSpoofedUserAgent =
     'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 '
     '(KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36';
 
+/// Hosts that open in an in-app browser sheet instead of leaving the app
+/// entirely — e.g. huulo's "Shop" link, which points at Incil's own webshop.
+const _inAppBrowserHosts = ['shop.incil.ch'];
+
 class WebViewScreen extends StatelessWidget {
   const WebViewScreen({
     super.key,
@@ -271,7 +275,11 @@ class _WebViewViewState extends State<_WebViewView> {
     if (isHostAllowed(uri, widget.allowedHosts)) {
       return NavigationDecision.navigate;
     }
-    _urls.openExternal(uri);
+    if (isHostAllowed(uri, _inAppBrowserHosts)) {
+      _urls.openInAppBrowser(uri);
+    } else {
+      _urls.openExternal(uri);
+    }
     return NavigationDecision.prevent;
   }
 
