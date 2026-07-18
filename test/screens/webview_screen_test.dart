@@ -54,6 +54,8 @@ class _FakeWebViewController extends PlatformWebViewController {
   _FakeWebViewController(super.params) : super.implementation();
 
   final List<Uri> loadedUris = [];
+  bool verticalScrollBarEnabled = true;
+  bool horizontalScrollBarEnabled = true;
 
   @override
   Future<void> loadRequest(LoadRequestParams params) async {
@@ -65,6 +67,16 @@ class _FakeWebViewController extends PlatformWebViewController {
 
   @override
   Future<void> setBackgroundColor(Color color) async {}
+
+  @override
+  Future<void> setVerticalScrollBarEnabled(bool enabled) async {
+    verticalScrollBarEnabled = enabled;
+  }
+
+  @override
+  Future<void> setHorizontalScrollBarEnabled(bool enabled) async {
+    horizontalScrollBarEnabled = enabled;
+  }
 
   @override
   Future<void> setPlatformNavigationDelegate(
@@ -170,6 +182,13 @@ void main() {
       expect(platform.controllers.single.loadedUris, [
         Uri.parse('https://incil.huulo.io/app'),
       ]);
+    });
+
+    testWidgets('hides native WebView scrollbars', (tester) async {
+      await tester.pumpWidget(wrap('https://incil.huulo.io/app'));
+
+      expect(platform.controllers.single.verticalScrollBarEnabled, isFalse);
+      expect(platform.controllers.single.horizontalScrollBarEnabled, isFalse);
     });
 
     testWidgets('URL change triggers exactly one extra loadRequest on the SAME '

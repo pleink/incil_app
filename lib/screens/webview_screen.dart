@@ -134,6 +134,8 @@ class _WebViewViewState extends State<_WebViewView> {
       // The huulo page paints no body background of its own; anything but
       // white here bleeds through and clashes with its white UI elements.
       ..setBackgroundColor(Colors.white)
+      ..setVerticalScrollBarEnabled(false)
+      ..setHorizontalScrollBarEnabled(false)
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (u) {
