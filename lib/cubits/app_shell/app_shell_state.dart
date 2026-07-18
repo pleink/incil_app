@@ -43,15 +43,22 @@ final class AppShellWebView extends AppShellState {
   const AppShellWebView({
     required this.url,
     required this.allowedHosts,
+    required this.inAppBrowserHosts,
     required this.oneSignalTags,
   });
 
   final String url;
   final List<String> allowedHosts;
+  final List<String> inAppBrowserHosts;
   final Map<String, String> oneSignalTags;
 
   @override
-  List<Object?> get props => [url, allowedHosts, oneSignalTags];
+  List<Object?> get props => [
+    url,
+    allowedHosts,
+    inAppBrowserHosts,
+    oneSignalTags,
+  ];
 }
 
 final class AppShellOffline extends AppShellState {

@@ -193,6 +193,7 @@ class AppShellCubit extends Cubit<AppShellState> {
       return AppShellWebView(
         url: pending.toString(),
         allowedHosts: appState.allowedHosts,
+        inAppBrowserHosts: appState.inAppBrowserHosts,
         oneSignalTags: appState.oneSignalTags,
       );
     }
@@ -205,6 +206,7 @@ class AppShellCubit extends Cubit<AppShellState> {
       return AppShellWebView(
         url: current.url,
         allowedHosts: appState.allowedHosts,
+        inAppBrowserHosts: appState.inAppBrowserHosts,
         oneSignalTags: appState.oneSignalTags,
       );
     }
@@ -212,6 +214,7 @@ class AppShellCubit extends Cubit<AppShellState> {
     return AppShellWebView(
       url: appState.webviewUrl,
       allowedHosts: appState.allowedHosts,
+      inAppBrowserHosts: appState.inAppBrowserHosts,
       oneSignalTags: appState.oneSignalTags,
     );
   }
@@ -266,6 +269,7 @@ class AppShellCubit extends Cubit<AppShellState> {
       AppShellWebView(
         url: uri.toString(),
         allowedHosts: current.allowedHosts,
+        inAppBrowserHosts: current.inAppBrowserHosts,
         oneSignalTags: current.oneSignalTags,
       ),
     );

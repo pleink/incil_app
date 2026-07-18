@@ -48,8 +48,9 @@ test/                                 # util/, cubits/, models round-trip
 
 ```
 Firestore collection                               SharedPreferences cache
- config/{webview,allowedHosts,emergency,            cachedAppStateJson
-        forceUpdate,onboarding,oneSignalTags}
+ config/{webview,allowedHosts,inAppBrowserHosts,    cachedAppStateJson
+        emergency,forceUpdate,onboarding,
+        oneSignalTags}
         │                                                  ▲
         ▼                                                  │
  AppStateService                                           │

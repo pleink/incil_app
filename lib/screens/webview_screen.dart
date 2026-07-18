@@ -31,25 +31,40 @@ class WebViewScreen extends StatelessWidget {
     super.key,
     required this.url,
     required this.allowedHosts,
+    required this.inAppBrowserHosts,
   });
 
   final String url;
   final List<String> allowedHosts;
 
+  /// Hosts that open in an in-app browser sheet instead of leaving the app
+  /// entirely — e.g. huulo's "Shop" link, which points at Incil's own
+  /// webshop. Firestore-driven, see `config/inAppBrowserHosts`.
+  final List<String> inAppBrowserHosts;
+
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => WebViewCubit(),
-      child: _WebViewView(url: url, allowedHosts: allowedHosts),
+      child: _WebViewView(
+        url: url,
+        allowedHosts: allowedHosts,
+        inAppBrowserHosts: inAppBrowserHosts,
+      ),
     );
   }
 }
 
 class _WebViewView extends StatefulWidget {
-  const _WebViewView({required this.url, required this.allowedHosts});
+  const _WebViewView({
+    required this.url,
+    required this.allowedHosts,
+    required this.inAppBrowserHosts,
+  });
 
   final String url;
   final List<String> allowedHosts;
+  final List<String> inAppBrowserHosts;
 
   @override
   State<_WebViewView> createState() => _WebViewViewState();
@@ -271,7 +286,11 @@ class _WebViewViewState extends State<_WebViewView> {
     if (isHostAllowed(uri, widget.allowedHosts)) {
       return NavigationDecision.navigate;
     }
-    _urls.openExternal(uri);
+    if (isHostAllowed(uri, widget.inAppBrowserHosts)) {
+      _urls.openInAppBrowser(uri);
+    } else {
+      _urls.openExternal(uri);
+    }
     return NavigationDecision.prevent;
   }
 

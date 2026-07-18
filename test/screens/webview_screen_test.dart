@@ -24,6 +24,7 @@ class _AppShellCubitMock extends MockCubit<AppShellState>
 /// `loadRequest` issued against them.
 class _FakeWebViewPlatform extends WebViewPlatform {
   final List<_FakeWebViewController> controllers = [];
+  final List<_FakeNavigationDelegate> delegates = [];
 
   @override
   PlatformWebViewController createPlatformWebViewController(
@@ -37,7 +38,11 @@ class _FakeWebViewPlatform extends WebViewPlatform {
   @override
   PlatformNavigationDelegate createPlatformNavigationDelegate(
     PlatformNavigationDelegateCreationParams params,
-  ) => _FakeNavigationDelegate(params);
+  ) {
+    final delegate = _FakeNavigationDelegate(params);
+    delegates.add(delegate);
+    return delegate;
+  }
 
   @override
   PlatformWebViewWidget createPlatformWebViewWidget(
@@ -73,10 +78,14 @@ class _FakeWebViewController extends PlatformWebViewController {
 class _FakeNavigationDelegate extends PlatformNavigationDelegate {
   _FakeNavigationDelegate(super.params) : super.implementation();
 
+  NavigationRequestCallback? onNavigationRequest;
+
   @override
   Future<void> setOnNavigationRequest(
     NavigationRequestCallback onNavigationRequest,
-  ) async {}
+  ) async {
+    this.onNavigationRequest = onNavigationRequest;
+  }
 
   @override
   Future<void> setOnPageStarted(PageEventCallback onPageStarted) async {}
@@ -99,12 +108,23 @@ class _FakeWebViewWidget extends PlatformWebViewWidget {
 
 void main() {
   late _FakeWebViewPlatform platform;
+  late _UrlServiceMock urlService;
   late _ConnectivityServiceMock connectivity;
   late _AppShellCubitMock shellCubit;
+
+  setUpAll(() {
+    registerFallbackValue(Uri.parse('https://example.com'));
+  });
 
   setUp(() {
     platform = _FakeWebViewPlatform();
     WebViewPlatform.instance = platform;
+
+    urlService = _UrlServiceMock();
+    when(() => urlService.openExternal(any())).thenAnswer((_) async => true);
+    when(
+      () => urlService.openInAppBrowser(any()),
+    ).thenAnswer((_) async => true);
 
     connectivity = _ConnectivityServiceMock();
     when(() => connectivity.isOnline()).thenAnswer((_) async => true);
@@ -120,7 +140,7 @@ void main() {
     );
 
     getIt
-      ..registerSingleton<UrlService>(_UrlServiceMock())
+      ..registerSingleton<UrlService>(urlService)
       ..registerSingleton<ConnectivityService>(connectivity);
   });
 
@@ -134,7 +154,11 @@ void main() {
     supportedLocales: AppLocalizations.supportedLocales,
     home: BlocProvider<AppShellCubit>.value(
       value: shellCubit,
-      child: WebViewScreen(url: url, allowedHosts: const ['incil.huulo.io']),
+      child: WebViewScreen(
+        url: url,
+        allowedHosts: const ['incil.huulo.io'],
+        inAppBrowserHosts: const ['shop.incil.ch'],
+      ),
     ),
   );
 
@@ -179,6 +203,7 @@ void main() {
         const deepLink = AppShellWebView(
           url: 'https://incil.huulo.io/post/das-war-incil-24',
           allowedHosts: ['incil.huulo.io'],
+          inAppBrowserHosts: ['shop.incil.ch'],
           oneSignalTags: {},
         );
         whenListen(
@@ -204,6 +229,7 @@ void main() {
         const same = AppShellWebView(
           url: 'https://incil.huulo.io/app',
           allowedHosts: ['incil.huulo.io'],
+          inAppBrowserHosts: ['shop.incil.ch'],
           oneSignalTags: {},
         );
         whenListen(
@@ -218,5 +244,44 @@ void main() {
         expect(platform.controllers.single.loadedUris, hasLength(1));
       },
     );
+  });
+
+  group('WebViewScreen navigation interception', () {
+    testWidgets('shop.incil.ch opens in the in-app browser, not externally', (
+      tester,
+    ) async {
+      await tester.pumpWidget(wrap('https://incil.huulo.io/app'));
+
+      final decision = await platform.delegates.single.onNavigationRequest!(
+        NavigationRequest(
+          url: 'https://shop.incil.ch/products',
+          isMainFrame: true,
+        ),
+      );
+
+      expect(decision, NavigationDecision.prevent);
+      verify(
+        () => urlService.openInAppBrowser(
+          Uri.parse('https://shop.incil.ch/products'),
+        ),
+      ).called(1);
+      verifyNever(() => urlService.openExternal(any()));
+    });
+
+    testWidgets('unrelated external hosts still open externally', (
+      tester,
+    ) async {
+      await tester.pumpWidget(wrap('https://incil.huulo.io/app'));
+
+      final decision = await platform.delegates.single.onNavigationRequest!(
+        NavigationRequest(url: 'https://example.com', isMainFrame: true),
+      );
+
+      expect(decision, NavigationDecision.prevent);
+      verify(
+        () => urlService.openExternal(Uri.parse('https://example.com')),
+      ).called(1);
+      verifyNever(() => urlService.openInAppBrowser(any()));
+    });
   });
 }
