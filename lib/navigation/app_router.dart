@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -13,6 +14,7 @@ import '../screens/offline_screen.dart';
 import '../screens/onboarding_screen.dart';
 import '../screens/splash_screen.dart';
 import '../screens/webview_screen.dart';
+import '../style/incil_system_ui.dart';
 
 abstract final class AppRoutes {
   static const splash = '/splash';
@@ -94,6 +96,19 @@ String? _redirectFor(AppShellState state) {
     AppShellOnboarding() => AppRoutes.onboarding,
     AppShellWebView() => AppRoutes.webview,
     AppShellOffline() => AppRoutes.offline,
+  };
+}
+
+/// Status-bar contrast for the active screen: dark backgrounds get light
+/// icons, light backgrounds dark. Applied above the router, not per screen.
+SystemUiOverlayStyle overlayStyleFor(AppShellState state) {
+  return switch (state) {
+    AppShellSplash() => IncilSystemUi.lightIcons,
+    AppShellEmergency() => IncilSystemUi.lightIcons,
+    AppShellOnboarding() => IncilSystemUi.lightIcons,
+    AppShellForceUpdate() => IncilSystemUi.darkIcons,
+    AppShellWebView() => IncilSystemUi.darkIcons,
+    AppShellOffline() => IncilSystemUi.darkIcons,
   };
 }
 
