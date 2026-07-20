@@ -170,6 +170,9 @@ class _WebViewViewState extends State<_WebViewView> {
               cubit.onPageFinished();
             }
           },
+          onUrlChange: (_) {
+            controller.runJavaScript(WebViewPopupScripts.removeGoogleLogin);
+          },
           onWebResourceError: (err) {
             // A killed WebContent process is recoverable — swap in a fresh
             // controller instead of falling through to the offline screen.

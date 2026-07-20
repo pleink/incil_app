@@ -108,6 +108,7 @@ class _FakeNavigationDelegate extends PlatformNavigationDelegate {
   NavigationRequestCallback? onNavigationRequest;
   PageEventCallback? onPageStarted;
   PageEventCallback? onPageFinished;
+  UrlChangeCallback? onUrlChange;
 
   @override
   Future<void> setOnNavigationRequest(
@@ -124,6 +125,11 @@ class _FakeNavigationDelegate extends PlatformNavigationDelegate {
   @override
   Future<void> setOnPageFinished(PageEventCallback onPageFinished) async {
     this.onPageFinished = onPageFinished;
+  }
+
+  @override
+  Future<void> setOnUrlChange(UrlChangeCallback onUrlChange) async {
+    this.onUrlChange = onUrlChange;
   }
 
   @override
@@ -329,6 +335,61 @@ void main() {
         );
       },
     );
+
+    testWidgets('URL change reruns Google login remover for SPA routes', (
+      tester,
+    ) async {
+      await tester.pumpWidget(wrap('https://incil.huulo.io/password-reset'));
+
+      platform.delegates.single.onUrlChange!(
+        const UrlChange(url: 'https://incil.huulo.io/login'),
+      );
+
+      expect(
+        platform.controllers.single.javaScripts,
+        contains(WebViewPopupScripts.removeGoogleLogin),
+      );
+    });
+
+    testWidgets(
+      'URL change on password reset keeps external URL interception intact',
+      (tester) async {
+        await tester.pumpWidget(wrap('https://incil.huulo.io/login'));
+
+        platform.delegates.single.onUrlChange!(
+          const UrlChange(url: 'https://incil.huulo.io/password-reset'),
+        );
+
+        final decision = await platform.delegates.single.onNavigationRequest!(
+          NavigationRequest(
+            url: 'https://incil.huulo.io/signup',
+            isMainFrame: true,
+          ),
+        );
+
+        expect(decision, NavigationDecision.prevent);
+        expect(
+          platform.controllers.single.javaScripts,
+          contains(WebViewPopupScripts.removeGoogleLogin),
+        );
+        verify(
+          () => urlService.openExternal(
+            Uri.parse('https://incil.huulo.io/signup'),
+          ),
+        ).called(1);
+      },
+    );
+
+    test('Google login remover watches SPA history without timing out', () {
+      expect(WebViewPopupScripts.removeGoogleLogin, contains('popstate'));
+      expect(WebViewPopupScripts.removeGoogleLogin, contains('pushState'));
+      expect(WebViewPopupScripts.removeGoogleLogin, contains('replaceState'));
+      expect(WebViewPopupScripts.removeGoogleLogin, isNot(contains('30000')));
+      expect(
+        WebViewPopupScripts.removeGoogleLogin,
+        isNot(contains('disconnect')),
+      );
+    });
 
     testWidgets('registers JavaScript channel for SPA external URL clicks', (
       tester,

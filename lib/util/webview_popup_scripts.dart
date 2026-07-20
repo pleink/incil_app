@@ -32,6 +32,9 @@ abstract final class WebViewPopupScripts {
   /// Removes Huulo's Google login option inside the WebView. The Firebase
   /// redirect flow loses its browser session state in embedded auth contexts,
   /// so the native shell hides that option and leaves email/password auth.
+  /// Huulo is an SPA, so route changes and back navigation may not trigger
+  /// page lifecycle callbacks. Keep the remover alive in the page context and
+  /// rerun it whenever the browser history changes.
   static const String removeGoogleLogin = '''
 (function () {
   var normalize = function (text) {
@@ -76,15 +79,35 @@ abstract final class WebViewPopupScripts {
   };
 
   window.__incilRemoveGoogleLogin = remove;
-  if (window.__incilGoogleLoginRemover) {
-    remove();
-    return;
-  }
-  window.__incilGoogleLoginRemover = true;
 
-  var observer = new MutationObserver(remove);
-  observer.observe(document.documentElement, { childList: true, subtree: true });
-  setTimeout(function () { observer.disconnect(); }, 30000);
+  var runAfterRouteChange = function () {
+    setTimeout(remove, 0);
+  };
+
+  if (!window.__incilGoogleLoginHistoryPatched) {
+    window.__incilGoogleLoginHistoryPatched = true;
+    var patch = function (name) {
+      var original = history[name];
+      history[name] = function () {
+        var result = original.apply(this, arguments);
+        runAfterRouteChange();
+        return result;
+      };
+    };
+    patch('pushState');
+    patch('replaceState');
+    window.addEventListener('popstate', runAfterRouteChange);
+  }
+
+  var observerRoot = document.documentElement || document.body;
+  if (!window.__incilGoogleLoginObserver && observerRoot) {
+    window.__incilGoogleLoginObserver = new MutationObserver(remove);
+    window.__incilGoogleLoginObserver.observe(
+      observerRoot,
+      { childList: true, subtree: true }
+    );
+  }
+
   remove();
 })();
 ''';
