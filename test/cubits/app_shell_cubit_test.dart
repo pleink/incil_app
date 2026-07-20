@@ -37,11 +37,13 @@ AppState _state({
   String webviewUrl = 'https://incil.huulo.io/app',
   List<String> allowedHosts = const ['incil.huulo.io'],
   List<String> inAppBrowserHosts = const ['shop.incil.ch'],
+  List<String> externalBrowserUrls = const ['/signup'],
   Map<String, String> tags = const {},
 }) => AppState(
   webviewUrl: webviewUrl,
   allowedHosts: allowedHosts,
   inAppBrowserHosts: inAppBrowserHosts,
+  externalBrowserUrls: externalBrowserUrls,
   emergency: emergency,
   forceUpdate: forceUpdate,
   onboarding: onboarding,

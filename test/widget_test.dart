@@ -14,6 +14,7 @@ void main() {
       webviewUrl: 'https://example.com',
       allowedHosts: ['example.com'],
       inAppBrowserHosts: ['shop.example.com'],
+      externalBrowserUrls: ['/signup'],
       emergency: EmergencyConfig.empty,
       forceUpdate: ForceUpdateConfig.empty,
       onboarding: OnboardingConfig.empty,
@@ -25,6 +26,7 @@ void main() {
     expect(decoded.webviewUrl, state.webviewUrl);
     expect(decoded.allowedHosts, state.allowedHosts);
     expect(decoded.inAppBrowserHosts, state.inAppBrowserHosts);
+    expect(decoded.externalBrowserUrls, state.externalBrowserUrls);
     expect(decoded.oneSignalTags, state.oneSignalTags);
     expect(decoded.emergency.enabled, false);
     expect(decoded.forceUpdate.enabled, false);

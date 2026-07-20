@@ -12,7 +12,8 @@ Detailed references: [Architecture](docs/architecture.md) · [Conventions](docs/
 Native screens cover splash, onboarding, emergency, force-update, and offline;
 everything else is the WebView. Remote control comes from the Firestore
 `config` collection (one document per concern: `webview`, `allowedHosts`,
-`inAppBrowserHosts`, `emergency`, `forceUpdate`, `onboarding`, `oneSignalTags`).
+`inAppBrowserHosts`, `externalBrowserUrls`, `emergency`, `forceUpdate`,
+`onboarding`, `oneSignalTags`).
 Push notifications go through
 OneSignal. Platforms: **iOS + Android only**.
 

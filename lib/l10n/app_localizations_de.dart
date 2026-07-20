@@ -42,7 +42,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get forceUpdateDefaultTitle => 'Update erforderlich';
 
   @override
-  String get forceUpdateAction => 'Update öffnen';
+  String get forceUpdateAction => 'Jetzt aktualisieren';
 
   @override
   String get onboardingNext => 'Weiter';

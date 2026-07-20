@@ -16,7 +16,13 @@ void main() {
     ];
     const darkIconStates = <AppShellState>[
       AppShellForceUpdate(ForceUpdateConfig.empty),
-      AppShellWebView(url: 'https://x', allowedHosts: [], oneSignalTags: {}),
+      AppShellWebView(
+        url: 'https://x',
+        allowedHosts: [],
+        inAppBrowserHosts: [],
+        externalBrowserUrls: [],
+        oneSignalTags: {},
+      ),
       AppShellOffline(),
     ];
 

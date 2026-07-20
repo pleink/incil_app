@@ -212,6 +212,9 @@ Minimal seed documents:
 // config/inAppBrowserHosts
 { "urls": ["shop.incil.ch"] }
 
+// config/externalBrowserUrls
+{ "urls": ["/signup"] }
+
 // config/emergency
 { "enabled": false, "title": "", "subtitle": "", "body1": "", "contact": "", "body2": "", "footer": "" }
 
@@ -225,6 +228,10 @@ Minimal seed documents:
 // config/oneSignalTags
 { "app": "incil", "camp": "incil" }
 ```
+
+`externalBrowserUrls` entries leave the app through the system browser before
+normal allowed-host handling; path-only entries such as `/signup` match the
+current huulo event host.
 
 Firestore security rules live in `firestore.rules` at the repo root
 (read-only for the app). Deploy with:

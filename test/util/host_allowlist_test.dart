@@ -61,4 +61,69 @@ void main() {
       );
     });
   });
+
+  group('isExternalBrowserUrl', () {
+    test('matches path-only entries on any host', () {
+      expect(
+        isExternalBrowserUrl(
+          Uri.parse('https://incil-26-8144.huulo.app/signup'),
+          const ['/signup'],
+        ),
+        isTrue,
+      );
+    });
+
+    test('tolerates entries saved with literal surrounding quotes', () {
+      expect(
+        isExternalBrowserUrl(
+          Uri.parse('https://incil-26-8144.huulo.app/signup'),
+          const ['"/signup"'],
+        ),
+        isTrue,
+      );
+    });
+
+    test('matches absolute URL entries with equivalent trailing slash', () {
+      expect(
+        isExternalBrowserUrl(
+          Uri.parse('https://incil.huulo.io/signup/'),
+          const ['https://incil.huulo.io/signup'],
+        ),
+        isTrue,
+      );
+    });
+
+    test('absolute entries without a query match URLs with any query', () {
+      expect(
+        isExternalBrowserUrl(
+          Uri.parse('https://incil.huulo.io/signup?ref=app'),
+          const ['https://incil.huulo.io/signup'],
+        ),
+        isTrue,
+      );
+    });
+
+    test('absolute entries with a query require the same query', () {
+      expect(
+        isExternalBrowserUrl(
+          Uri.parse('https://incil.huulo.io/signup?ref=other'),
+          const ['https://incil.huulo.io/signup?ref=app'],
+        ),
+        isFalse,
+      );
+    });
+
+    test('rejects unrelated paths and non-web schemes', () {
+      expect(
+        isExternalBrowserUrl(Uri.parse('https://incil.huulo.io/login'), const [
+          '/signup',
+        ]),
+        isFalse,
+      );
+      expect(
+        isExternalBrowserUrl(Uri.parse('mailto:a@b.ch'), const ['/signup']),
+        isFalse,
+      );
+    });
+  });
 }

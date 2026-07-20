@@ -194,6 +194,7 @@ class AppShellCubit extends Cubit<AppShellState> {
         url: pending.toString(),
         allowedHosts: appState.allowedHosts,
         inAppBrowserHosts: appState.inAppBrowserHosts,
+        externalBrowserUrls: appState.externalBrowserUrls,
         oneSignalTags: appState.oneSignalTags,
       );
     }
@@ -207,6 +208,7 @@ class AppShellCubit extends Cubit<AppShellState> {
         url: current.url,
         allowedHosts: appState.allowedHosts,
         inAppBrowserHosts: appState.inAppBrowserHosts,
+        externalBrowserUrls: appState.externalBrowserUrls,
         oneSignalTags: appState.oneSignalTags,
       );
     }
@@ -215,6 +217,7 @@ class AppShellCubit extends Cubit<AppShellState> {
       url: appState.webviewUrl,
       allowedHosts: appState.allowedHosts,
       inAppBrowserHosts: appState.inAppBrowserHosts,
+      externalBrowserUrls: appState.externalBrowserUrls,
       oneSignalTags: appState.oneSignalTags,
     );
   }
@@ -270,6 +273,7 @@ class AppShellCubit extends Cubit<AppShellState> {
         url: uri.toString(),
         allowedHosts: current.allowedHosts,
         inAppBrowserHosts: current.inAppBrowserHosts,
+        externalBrowserUrls: current.externalBrowserUrls,
         oneSignalTags: current.oneSignalTags,
       ),
     );

@@ -44,6 +44,8 @@ void main() {
       const AppShellWebView(
         url: 'https://x',
         allowedHosts: [],
+        inAppBrowserHosts: [],
+        externalBrowserUrls: [],
         oneSignalTags: {},
       ),
     );

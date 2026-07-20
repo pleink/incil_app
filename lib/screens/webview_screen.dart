@@ -3,6 +3,7 @@ import 'dart:io' show Platform;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -32,6 +33,7 @@ class WebViewScreen extends StatelessWidget {
     required this.url,
     required this.allowedHosts,
     required this.inAppBrowserHosts,
+    required this.externalBrowserUrls,
   });
 
   final String url;
@@ -41,6 +43,7 @@ class WebViewScreen extends StatelessWidget {
   /// entirely — e.g. huulo's "Shop" link, which points at Incil's own
   /// webshop. Firestore-driven, see `config/inAppBrowserHosts`.
   final List<String> inAppBrowserHosts;
+  final List<String> externalBrowserUrls;
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +53,7 @@ class WebViewScreen extends StatelessWidget {
         url: url,
         allowedHosts: allowedHosts,
         inAppBrowserHosts: inAppBrowserHosts,
+        externalBrowserUrls: externalBrowserUrls,
       ),
     );
   }
@@ -60,11 +64,13 @@ class _WebViewView extends StatefulWidget {
     required this.url,
     required this.allowedHosts,
     required this.inAppBrowserHosts,
+    required this.externalBrowserUrls,
   });
 
   final String url;
   final List<String> allowedHosts;
   final List<String> inAppBrowserHosts;
+  final List<String> externalBrowserUrls;
 
   @override
   State<_WebViewView> createState() => _WebViewViewState();
@@ -136,16 +142,25 @@ class _WebViewViewState extends State<_WebViewView> {
       ..setBackgroundColor(Colors.white)
       ..setVerticalScrollBarEnabled(false)
       ..setHorizontalScrollBarEnabled(false)
+      ..addJavaScriptChannel(
+        WebViewPopupScripts.externalBrowserChannel,
+        onMessageReceived: (message) =>
+            _openExternalBrowserMessage(message.message),
+      )
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (u) {
             // Seed consent keys before the huulo bundle runs so the cookie
             // banner and web push prompt never mount (issue #18).
             controller.runJavaScript(WebViewPopupScripts.preseedConsent);
+            controller.runJavaScript(WebViewPopupScripts.removeGoogleLogin);
+            _injectExternalBrowserInterceptor(controller);
             cubit.onPageStarted();
           },
           onPageFinished: (u) {
             controller.runJavaScript(WebViewPopupScripts.dismissPopups);
+            controller.runJavaScript(WebViewPopupScripts.removeGoogleLogin);
+            _injectExternalBrowserInterceptor(controller);
             if (Platform.isIOS) {
               // Don't reveal the page yet — on a first visit the content
               // process can die right after onPageFinished (huulo's auth
@@ -265,6 +280,12 @@ class _WebViewViewState extends State<_WebViewView> {
     if (widget.url != oldWidget.url) {
       _swapUrl(widget.url);
     }
+    if (!listEquals(
+      widget.externalBrowserUrls,
+      oldWidget.externalBrowserUrls,
+    )) {
+      _injectExternalBrowserInterceptor(_controller);
+    }
   }
 
   /// Loads [url] without recreating the controller; no-op when it is already
@@ -285,6 +306,10 @@ class _WebViewViewState extends State<_WebViewView> {
   NavigationDecision _handleNavigation(NavigationRequest request) {
     final uri = Uri.tryParse(request.url);
     if (uri == null) return NavigationDecision.prevent;
+    if (isExternalBrowserUrl(uri, widget.externalBrowserUrls)) {
+      _urls.openExternal(uri);
+      return NavigationDecision.prevent;
+    }
     if (isHostAllowed(uri, widget.allowedHosts)) {
       return NavigationDecision.navigate;
     }
@@ -294,6 +319,21 @@ class _WebViewViewState extends State<_WebViewView> {
       _urls.openExternal(uri);
     }
     return NavigationDecision.prevent;
+  }
+
+  void _injectExternalBrowserInterceptor(WebViewController controller) {
+    controller.runJavaScript(
+      WebViewPopupScripts.externalBrowserInterceptor(
+        widget.externalBrowserUrls,
+      ),
+    );
+  }
+
+  void _openExternalBrowserMessage(String message) {
+    final uri = Uri.tryParse(message);
+    if (uri == null) return;
+    if (!isExternalBrowserUrl(uri, widget.externalBrowserUrls)) return;
+    _urls.openExternal(uri);
   }
 
   @override

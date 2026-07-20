@@ -37,8 +37,8 @@ class AppStateService {
   bool get hasFreshData => _hasFreshData;
 
   /// Flat remote-control collection: one document per concern
-  /// (webview, allowedHosts, emergency, forceUpdate, onboarding,
-  /// oneSignalTags).
+  /// (webview, allowedHosts, inAppBrowserHosts, externalBrowserUrls,
+  /// emergency, forceUpdate, onboarding, oneSignalTags).
   static const _collectionPath = 'config';
 
   Stream<AppState?> get stream => _subject.stream;

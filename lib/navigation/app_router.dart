@@ -78,6 +78,7 @@ GoRouter buildAppRouter(AppShellCubit cubit, {AnalyticsService? analytics}) {
                   url: s.url,
                   allowedHosts: s.allowedHosts,
                   inAppBrowserHosts: s.inAppBrowserHosts,
+                  externalBrowserUrls: s.externalBrowserUrls,
                 )
               : const SplashScreen();
         },

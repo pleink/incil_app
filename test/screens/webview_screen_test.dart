@@ -12,6 +12,7 @@ import 'package:incil_camp_app/l10n/app_localizations.dart';
 import 'package:incil_camp_app/screens/webview_screen.dart';
 import 'package:incil_camp_app/services/connectivity_service.dart';
 import 'package:incil_camp_app/services/url_service.dart';
+import 'package:incil_camp_app/util/webview_popup_scripts.dart';
 
 class _UrlServiceMock extends Mock implements UrlService {}
 
@@ -54,6 +55,8 @@ class _FakeWebViewController extends PlatformWebViewController {
   _FakeWebViewController(super.params) : super.implementation();
 
   final List<Uri> loadedUris = [];
+  final List<String> javaScripts = [];
+  final Map<String, JavaScriptChannelParams> javaScriptChannels = {};
   bool verticalScrollBarEnabled = true;
   bool horizontalScrollBarEnabled = true;
 
@@ -84,6 +87,18 @@ class _FakeWebViewController extends PlatformWebViewController {
   ) async {}
 
   @override
+  Future<void> runJavaScript(String javaScript) async {
+    javaScripts.add(javaScript);
+  }
+
+  @override
+  Future<void> addJavaScriptChannel(
+    JavaScriptChannelParams javaScriptChannelParams,
+  ) async {
+    javaScriptChannels[javaScriptChannelParams.name] = javaScriptChannelParams;
+  }
+
+  @override
   Future<void> reload() async {}
 }
 
@@ -91,6 +106,8 @@ class _FakeNavigationDelegate extends PlatformNavigationDelegate {
   _FakeNavigationDelegate(super.params) : super.implementation();
 
   NavigationRequestCallback? onNavigationRequest;
+  PageEventCallback? onPageStarted;
+  PageEventCallback? onPageFinished;
 
   @override
   Future<void> setOnNavigationRequest(
@@ -100,10 +117,14 @@ class _FakeNavigationDelegate extends PlatformNavigationDelegate {
   }
 
   @override
-  Future<void> setOnPageStarted(PageEventCallback onPageStarted) async {}
+  Future<void> setOnPageStarted(PageEventCallback onPageStarted) async {
+    this.onPageStarted = onPageStarted;
+  }
 
   @override
-  Future<void> setOnPageFinished(PageEventCallback onPageFinished) async {}
+  Future<void> setOnPageFinished(PageEventCallback onPageFinished) async {
+    this.onPageFinished = onPageFinished;
+  }
 
   @override
   Future<void> setOnWebResourceError(
@@ -160,7 +181,10 @@ void main() {
     await getIt.reset();
   });
 
-  Widget wrap(String url) => MaterialApp(
+  Widget wrap(
+    String url, {
+    List<String> externalBrowserUrls = const ['/signup'],
+  }) => MaterialApp(
     locale: const Locale('de'),
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
@@ -170,6 +194,7 @@ void main() {
         url: url,
         allowedHosts: const ['incil.huulo.io'],
         inAppBrowserHosts: const ['shop.incil.ch'],
+        externalBrowserUrls: externalBrowserUrls,
       ),
     ),
   );
@@ -223,6 +248,7 @@ void main() {
           url: 'https://incil.huulo.io/post/das-war-incil-24',
           allowedHosts: ['incil.huulo.io'],
           inAppBrowserHosts: ['shop.incil.ch'],
+          externalBrowserUrls: ['/signup'],
           oneSignalTags: {},
         );
         whenListen(
@@ -249,6 +275,7 @@ void main() {
           url: 'https://incil.huulo.io/app',
           allowedHosts: ['incil.huulo.io'],
           inAppBrowserHosts: ['shop.incil.ch'],
+          externalBrowserUrls: ['/signup'],
           oneSignalTags: {},
         );
         whenListen(
@@ -263,6 +290,84 @@ void main() {
         expect(platform.controllers.single.loadedUris, hasLength(1));
       },
     );
+  });
+
+  group('WebViewScreen injected scripts', () {
+    testWidgets('page start seeds consent and starts Google login remover', (
+      tester,
+    ) async {
+      await tester.pumpWidget(wrap('https://incil.huulo.io/login'));
+
+      platform.delegates.single.onPageStarted!('https://incil.huulo.io/login');
+
+      expect(
+        platform.controllers.single.javaScripts,
+        containsAllInOrder([
+          WebViewPopupScripts.preseedConsent,
+          WebViewPopupScripts.removeGoogleLogin,
+          WebViewPopupScripts.externalBrowserInterceptor(const ['/signup']),
+        ]),
+      );
+    });
+
+    testWidgets(
+      'page finish dismisses popups and reruns Google login remover',
+      (tester) async {
+        await tester.pumpWidget(wrap('https://incil.huulo.io/login'));
+
+        platform.delegates.single.onPageFinished!(
+          'https://incil.huulo.io/login',
+        );
+
+        expect(
+          platform.controllers.single.javaScripts,
+          containsAllInOrder([
+            WebViewPopupScripts.dismissPopups,
+            WebViewPopupScripts.removeGoogleLogin,
+            WebViewPopupScripts.externalBrowserInterceptor(const ['/signup']),
+          ]),
+        );
+      },
+    );
+
+    testWidgets('registers JavaScript channel for SPA external URL clicks', (
+      tester,
+    ) async {
+      await tester.pumpWidget(wrap('https://incil.huulo.io/login'));
+
+      final channel = platform
+          .controllers
+          .single
+          .javaScriptChannels[WebViewPopupScripts.externalBrowserChannel];
+
+      expect(channel, isNotNull);
+
+      channel!.onMessageReceived(
+        const JavaScriptMessage(message: 'https://incil.huulo.io/signup'),
+      );
+
+      verify(
+        () =>
+            urlService.openExternal(Uri.parse('https://incil.huulo.io/signup')),
+      ).called(1);
+    });
+
+    testWidgets('ignores JavaScript channel URLs not listed as external', (
+      tester,
+    ) async {
+      await tester.pumpWidget(wrap('https://incil.huulo.io/login'));
+
+      final channel = platform
+          .controllers
+          .single
+          .javaScriptChannels[WebViewPopupScripts.externalBrowserChannel]!;
+
+      channel.onMessageReceived(
+        const JavaScriptMessage(message: 'https://incil.huulo.io/login'),
+      );
+
+      verifyNever(() => urlService.openExternal(any()));
+    });
   });
 
   group('WebViewScreen navigation interception', () {
@@ -302,5 +407,73 @@ void main() {
       ).called(1);
       verifyNever(() => urlService.openInAppBrowser(any()));
     });
+
+    testWidgets(
+      'configured external URLs override allowed hosts and leave the app',
+      (tester) async {
+        await tester.pumpWidget(wrap('https://incil.huulo.io/login'));
+
+        final decision = await platform.delegates.single.onNavigationRequest!(
+          NavigationRequest(
+            url: 'https://incil.huulo.io/signup',
+            isMainFrame: true,
+          ),
+        );
+
+        expect(decision, NavigationDecision.prevent);
+        verify(
+          () => urlService.openExternal(
+            Uri.parse('https://incil.huulo.io/signup'),
+          ),
+        ).called(1);
+        verifyNever(() => urlService.openInAppBrowser(any()));
+      },
+    );
+
+    testWidgets(
+      'Google OAuth is no longer specially allowed inside the WebView',
+      (tester) async {
+        await tester.pumpWidget(wrap('https://incil.huulo.io/app'));
+
+        final decision = await platform.delegates.single.onNavigationRequest!(
+          NavigationRequest(
+            url: 'https://accounts.google.com/o/oauth2/v2/auth',
+            isMainFrame: true,
+          ),
+        );
+
+        expect(decision, NavigationDecision.prevent);
+        verify(
+          () => urlService.openExternal(
+            Uri.parse('https://accounts.google.com/o/oauth2/v2/auth'),
+          ),
+        ).called(1);
+        verifyNever(() => urlService.openInAppBrowser(any()));
+      },
+    );
+
+    testWidgets(
+      'Firebase auth handler is no longer specially allowed inside the WebView',
+      (tester) async {
+        await tester.pumpWidget(wrap('https://incil.huulo.io/app'));
+
+        final decision = await platform.delegates.single.onNavigationRequest!(
+          NavigationRequest(
+            url: 'https://auth.huulo.app/__/auth/handler?state=abc&code=123',
+            isMainFrame: true,
+          ),
+        );
+
+        expect(decision, NavigationDecision.prevent);
+        verify(
+          () => urlService.openExternal(
+            Uri.parse(
+              'https://auth.huulo.app/__/auth/handler?state=abc&code=123',
+            ),
+          ),
+        ).called(1);
+        verifyNever(() => urlService.openInAppBrowser(any()));
+      },
+    );
   });
 }

@@ -44,12 +44,14 @@ final class AppShellWebView extends AppShellState {
     required this.url,
     required this.allowedHosts,
     required this.inAppBrowserHosts,
+    required this.externalBrowserUrls,
     required this.oneSignalTags,
   });
 
   final String url;
   final List<String> allowedHosts;
   final List<String> inAppBrowserHosts;
+  final List<String> externalBrowserUrls;
   final Map<String, String> oneSignalTags;
 
   @override
@@ -57,6 +59,7 @@ final class AppShellWebView extends AppShellState {
     url,
     allowedHosts,
     inAppBrowserHosts,
+    externalBrowserUrls,
     oneSignalTags,
   ];
 }

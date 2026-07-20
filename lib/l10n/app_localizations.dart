@@ -157,7 +157,7 @@ abstract class AppLocalizations {
   /// No description provided for @forceUpdateAction.
   ///
   /// In de, this message translates to:
-  /// **'Update öffnen'**
+  /// **'Jetzt aktualisieren'**
   String get forceUpdateAction;
 
   /// No description provided for @onboardingNext.
